@@ -1,0 +1,8 @@
+.node
+.env
+.DS_Store
+coverage
+.vscode
+node_modules
+dist
+.env.local
