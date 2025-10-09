@@ -50,7 +50,7 @@ A modern, browser-based reimagining of the classic Hard Drivin' arcade racer, le
 **Requirements**: WebGL 2.0, WASM support, ES6+ modules
 
 ### 2.4 Asset Specifications
-- **3D Models**: GLTF 2.0 / GLB format, max 50k tris per vehicle, max 200k tris total scene
+- **3D Models**: GLTF 2.0 / GLB format, max 50k tris per vehicle, max 800k tris total scene
 - **Textures**: PNG/JPG, power-of-two dimensions, 2K max resolution, BC7/ETC2 compressed
 - **Audio**: MP3 (fallback) + OGG Vorbis, 44.1kHz, stereo, 128-192kbps
 - **Total Bundle**: <25MB initial load, <75MB total with lazy-loaded assets

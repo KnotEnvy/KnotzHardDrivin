@@ -660,7 +660,7 @@ Track your effectiveness with agents:
 
 - **PRD.md** - Complete product requirements
 - **roadmap.md** - Detailed phase-by-phase development plan
-- **subagents.json** - Agent configuration reference
+- **subAgentsUserGuide.md** - Agent configuration reference
 
 ---
 
