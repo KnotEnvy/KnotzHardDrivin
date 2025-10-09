@@ -86,7 +86,7 @@
       },
     },
     server: {
-      port: 3000,
+      port: 4200,
       open: true,
     },
     build: {

@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 
   export class PhysicsWorld {
-    public world: RAPIER.World;
+    public world!: RAPIER.World;
     private initialized = false;
 
     async init(): Promise<void> {
