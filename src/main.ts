@@ -1,52 +1,54 @@
-// Phase 1A: Core Game Loop Test
+// Phase 2: Vehicle Physics & Input Test
 import { GameEngine, GameState } from './core/GameEngine';
 
 const engine = new GameEngine();
 
 // Start the game engine
-engine.start();
+engine.start().then(() => {
+  // Auto-start in PLAYING mode for Phase 2 testing
+  console.log('Auto-starting game in PLAYING mode...');
+  engine.setState(GameState.PLAYING);
+});
 
 // Add FPS display for monitoring performance
 const perfMonitor = engine.getPerformanceMonitor();
 const fpsDisplay = perfMonitor.createFPSDisplay();
 document.body.appendChild(fpsDisplay);
 
-// Log performance report every 10 seconds
+// Log performance report and vehicle telemetry every 10 seconds
 setInterval(() => {
   perfMonitor.logPerformanceReport();
 
-  // Also log state machine info
+  // Log state machine info
   console.log('\n=== State Machine Status ===');
   console.log(`Current State: ${engine.getState()}`);
   const stateManager = engine.getStateManager();
   console.log(`Valid Transitions: ${stateManager.getValidTransitions(engine.getState()).join(', ')}`);
+
+  // Log vehicle telemetry if available
+  const vehicle = engine.getVehicle();
+  if (vehicle) {
+    const telemetry = vehicle.getTelemetry();
+    console.log('\n=== Vehicle Telemetry ===');
+    console.log(`Speed: ${telemetry.speed.toFixed(1)} m/s (${telemetry.speedKmh.toFixed(1)} km/h)`);
+    console.log(`RPM: ${telemetry.rpm.toFixed(0)}`);
+    console.log(`Gear: ${telemetry.gear}`);
+    console.log(`Grounded Wheels: ${telemetry.wheelsOnGround}/4`);
+    console.log(`Airborne: ${telemetry.isAirborne}`);
+    console.log(`G-Force: ${telemetry.gForce.toFixed(2)}`);
+  }
 }, 10000);
 
-// Test state transitions with keyboard
-window.addEventListener('keydown', (event) => {
-  switch (event.key) {
-    case 'p':
-      // Toggle playing/paused
-      if (engine.getState() === GameState.MENU) {
-        engine.setState(GameState.PLAYING);
-      } else if (engine.getState() === GameState.PLAYING) {
-        engine.setState(GameState.PAUSED);
-      } else if (engine.getState() === GameState.PAUSED) {
-        engine.setState(GameState.PLAYING);
-      }
-      break;
-    case 'm':
-      // Back to menu (from paused)
-      if (engine.getState() === GameState.PAUSED) {
-        engine.setState(GameState.MENU);
-      }
-      break;
-  }
-});
-
-console.log('=== Phase 1A: Core Game Loop Active ===');
-console.log('Controls:');
-console.log('  [P] - Toggle Play/Pause');
-console.log('  [M] - Return to Menu (from paused)');
-console.log('  Check console for performance reports every 10s');
-console.log('=====================================');
+console.log('=== Phase 2: Vehicle Physics Active ===');
+console.log('Vehicle Controls:');
+console.log('  [W/↑]     - Throttle');
+console.log('  [S/↓]     - Brake');
+console.log('  [A/←]     - Steer Left');
+console.log('  [D/→]     - Steer Right');
+console.log('  [Space]   - Handbrake');
+console.log('  [R]       - Reset Vehicle');
+console.log('  [Esc/P]   - Pause/Unpause');
+console.log('');
+console.log('Gamepad supported (Xbox/PS layout)');
+console.log('Check console for performance reports every 10s');
+console.log('==========================================');

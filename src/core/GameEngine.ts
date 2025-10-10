@@ -2,6 +2,10 @@ import { SceneManager } from './SceneManager';
 import { PhysicsWorld } from './PhysicsWorld';
 import { StateManager } from './StateManager';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor';
+import { Vehicle } from '../entities/Vehicle';
+import { InputSystem } from '../systems/InputSystem';
+import { DEFAULT_VEHICLE_CONFIG } from '../config/PhysicsConfig';
+import * as THREE from 'three';
 
 /**
  * Game state enumeration representing all possible states the game can be in.
@@ -25,6 +29,10 @@ export class GameEngine {
   private physicsWorld: PhysicsWorld;
   private stateManager: StateManager;
   private performanceMonitor: PerformanceMonitor;
+
+  // Phase 2: Vehicle and Input
+  private vehicle?: Vehicle;
+  private inputSystem?: InputSystem;
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
@@ -98,6 +106,17 @@ export class GameEngine {
       // Only step physics when in states that need it
       if (this.shouldUpdatePhysics()) {
         this.physicsWorld.step(this.fixedTimeStep);
+
+        // Update vehicle physics (60Hz fixed timestep)
+        if (this.vehicle && this.inputSystem && this.state === GameState.PLAYING) {
+          const input = this.inputSystem.getInput();
+          // Convert InputSystem's VehicleInput (handbrake: boolean) to Vehicle's expected format (handbrake: number)
+          this.vehicle.setInput({
+            ...input,
+            handbrake: input.handbrake ? 1 : 0,
+          });
+          this.vehicle.update(this.fixedTimeStep);
+        }
       }
       this.accumulator -= this.fixedTimeStep;
     }
@@ -131,9 +150,34 @@ export class GameEngine {
         break;
       case GameState.PLAYING:
         // Update gameplay systems
+        if (this.inputSystem) {
+          this.inputSystem.update(deltaTime);
+          const input = this.inputSystem.getInput();
+
+          // Handle reset
+          if (input.reset && this.vehicle) {
+            this.vehicle.reset(
+              new THREE.Vector3(0, 2, 0),
+              new THREE.Quaternion()
+            );
+          }
+
+          // Handle pause
+          if (input.pause) {
+            this.setState(GameState.PAUSED);
+          }
+        }
         break;
       case GameState.PAUSED:
         // Minimal updates when paused
+        // Handle unpause
+        if (this.inputSystem) {
+          this.inputSystem.update(deltaTime);
+          const input = this.inputSystem.getInput();
+          if (input.pause) {
+            this.setState(GameState.PLAYING);
+          }
+        }
         break;
       case GameState.CRASHED:
         // Update crash effects
@@ -202,6 +246,23 @@ export class GameEngine {
       case GameState.PLAYING:
         // Start race timer, enable input
         this.accumulator = 0; // Reset accumulator
+
+        // Create vehicle
+        this.vehicle = new Vehicle(
+          this.physicsWorld.world,
+          DEFAULT_VEHICLE_CONFIG
+        );
+        // Initialize vehicle at spawn position (async but completes quickly)
+        this.vehicle.init(
+          new THREE.Vector3(0, 2, 0),  // 2m above ground
+          new THREE.Quaternion(),       // No rotation
+          this.sceneManager.scene       // Pass scene for visual meshes
+        );
+
+        // Create input system
+        this.inputSystem = new InputSystem();
+
+        console.log('Vehicle and InputSystem initialized');
         break;
       case GameState.PAUSED:
         // Show pause menu
@@ -231,6 +292,15 @@ export class GameEngine {
         break;
       case GameState.PLAYING:
         // Pause timers
+        // Clean up vehicle and input system
+        if (this.vehicle) {
+          this.vehicle.dispose();
+          this.vehicle = undefined;
+        }
+        if (this.inputSystem) {
+          this.inputSystem.dispose();
+          this.inputSystem = undefined;
+        }
         break;
       case GameState.PAUSED:
         // Hide pause menu
@@ -315,11 +385,33 @@ export class GameEngine {
   }
 
   /**
+   * Gets the vehicle instance (Phase 2).
+   */
+  getVehicle(): Vehicle | undefined {
+    return this.vehicle;
+  }
+
+  /**
+   * Gets the input system instance (Phase 2).
+   */
+  getInputSystem(): InputSystem | undefined {
+    return this.inputSystem;
+  }
+
+  /**
    * Stops the game loop and cleans up resources.
    */
   stop(): void {
     this.running = false;
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+
+    // Cleanup Phase 2 systems
+    if (this.vehicle) {
+      this.vehicle.dispose();
+    }
+    if (this.inputSystem) {
+      this.inputSystem.dispose();
+    }
   }
 }

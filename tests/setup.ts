@@ -1,9 +1,13 @@
 /**
  * Test setup file for Vitest
- * Configures global test environment and mocks
+ * Configures global test environment and mocks for Three.js, Rapier.js, and browser APIs
  */
 
 import { vi } from 'vitest';
+
+// ============================================================================
+// THREE.JS MOCKS
+// ============================================================================
 
 // Mock HTMLCanvasElement for Three.js
 class MockCanvas {
@@ -123,9 +127,390 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextType: string) => {
   return new MockCanvas().getContext();
 }) as any;
 
-// Mock window.addEventListener for resize events
-global.window.addEventListener = vi.fn();
-global.window.removeEventListener = vi.fn();
+// ============================================================================
+// RAPIER.JS MOCKS
+// ============================================================================
+
+/**
+ * Mock Rapier.js World for testing without actual physics engine
+ * Provides deterministic behavior for unit tests
+ */
+class MockRapierWorld {
+  private bodies: Map<number, any> = new Map();
+  private colliders: Map<number, any> = new Map();
+  private nextBodyId = 0;
+  private nextColliderId = 0;
+  public gravity = { x: 0, y: -9.81, z: 0 };
+
+  createRigidBody(desc: any): any {
+    const id = this.nextBodyId++;
+    const body = {
+      handle: id,
+      translation: vi.fn(() => desc._translation || { x: 0, y: 0, z: 0 }),
+      setTranslation: vi.fn((pos: any, wakeUp?: boolean) => {
+        desc._translation = pos;
+      }),
+      rotation: vi.fn(() => desc._rotation || { x: 0, y: 0, z: 0, w: 1 }),
+      setRotation: vi.fn((rot: any, wakeUp?: boolean) => {
+        desc._rotation = rot;
+      }),
+      linvel: vi.fn(() => desc._linvel || { x: 0, y: 0, z: 0 }),
+      setLinvel: vi.fn((vel: any, wakeUp?: boolean) => {
+        desc._linvel = vel;
+      }),
+      angvel: vi.fn(() => desc._angvel || { x: 0, y: 0, z: 0 }),
+      setAngvel: vi.fn((vel: any, wakeUp?: boolean) => {
+        desc._angvel = vel;
+      }),
+      mass: vi.fn(() => desc._mass || 1.0),
+      setAdditionalMass: vi.fn((mass: number) => {
+        desc._mass = mass;
+      }),
+      applyImpulse: vi.fn((impulse: any, wakeUp?: boolean) => {
+        // Simulate impulse by adding to velocity
+        if (desc._linvel) {
+          desc._linvel.x += impulse.x / (desc._mass || 1);
+          desc._linvel.y += impulse.y / (desc._mass || 1);
+          desc._linvel.z += impulse.z / (desc._mass || 1);
+        }
+      }),
+      applyTorqueImpulse: vi.fn((torque: any, wakeUp?: boolean) => {
+        // Simulate torque by adding to angular velocity
+        if (desc._angvel) {
+          desc._angvel.x += torque.x * 0.1;
+          desc._angvel.y += torque.y * 0.1;
+          desc._angvel.z += torque.z * 0.1;
+        }
+      }),
+      applyForce: vi.fn((force: any, wakeUp?: boolean) => {
+        // Forces are applied over time, for testing we'll track them
+        if (!desc._appliedForces) desc._appliedForces = [];
+        desc._appliedForces.push(force);
+      }),
+      applyForceAtPoint: vi.fn((force: any, point: any, wakeUp?: boolean) => {
+        if (!desc._appliedForces) desc._appliedForces = [];
+        desc._appliedForces.push({ force, point });
+      }),
+      resetForces: vi.fn((wakeUp?: boolean) => {
+        desc._appliedForces = [];
+      }),
+      resetTorques: vi.fn((wakeUp?: boolean) => {
+        desc._appliedTorques = [];
+      }),
+      isSleeping: vi.fn(() => false),
+      wakeUp: vi.fn(() => {}),
+      numColliders: vi.fn(() => 0),
+      lockTranslations: vi.fn((locked: boolean, wakeUp?: boolean) => {
+        desc._translationsLocked = locked;
+      }),
+      lockRotations: vi.fn((locked: boolean, wakeUp?: boolean) => {
+        desc._rotationsLocked = locked;
+      }),
+      setEnabledRotations: vi.fn((x: boolean, y: boolean, z: boolean, wakeUp?: boolean) => {
+        desc._enabledRotations = { x, y, z };
+      }),
+      setCcdEnabled: vi.fn((enabled: boolean) => {
+        desc._ccdEnabled = enabled;
+      }),
+      setGravityScale: vi.fn((scale: number, wakeUp?: boolean) => {
+        desc._gravityScale = scale;
+      }),
+      gravityScale: vi.fn(() => desc._gravityScale || 1.0),
+    };
+    this.bodies.set(id, body);
+    return body;
+  }
+
+  createCollider(desc: any, parent?: any): any {
+    const id = this.nextColliderId++;
+    const collider = {
+      handle: id,
+      parent: parent || null,
+      shape: desc._shape || 'cuboid',
+      friction: desc._friction || 0.5,
+      restitution: desc._restitution || 0.3,
+      density: desc._density || 1.0,
+      setFriction: vi.fn((f: number) => {
+        desc._friction = f;
+      }),
+      setRestitution: vi.fn((r: number) => {
+        desc._restitution = r;
+      }),
+    };
+    this.colliders.set(id, collider);
+    return collider;
+  }
+
+  removeRigidBody(body: any): void {
+    this.bodies.delete(body.handle);
+  }
+
+  removeCollider(collider: any): void {
+    this.colliders.delete(collider.handle);
+  }
+
+  step(): void {
+    // Mock physics step - does nothing in tests
+  }
+
+  castRay(
+    ray: any,
+    maxToi: number,
+    solid: boolean,
+    filterFlags?: any,
+    filterGroups?: any,
+    filterExcludeCollider?: any,
+    filterExcludeRigidBody?: any,
+    filterPredicate?: any
+  ): any | null {
+    // Mock raycast - can be overridden in tests
+    // Returns a hit at 0.3 meters down by default (ground contact)
+    if ((this as any)._raycastResults) {
+      const result = (this as any)._raycastResults.shift();
+      return result !== undefined ? result : null;
+    }
+
+    // Default: ground contact at suspension rest length
+    return {
+      toi: 0.3,
+      normal: { x: 0, y: 1, z: 0 },
+      collider: this.getCollider(0),
+    };
+  }
+
+  /**
+   * Set custom raycast results for testing
+   * @param results - Array of raycast results (null = no hit)
+   */
+  setRaycastResults(results: Array<any | null>): void {
+    (this as any)._raycastResults = [...results];
+  }
+
+  /**
+   * Clear custom raycast results
+   */
+  clearRaycastResults(): void {
+    delete (this as any)._raycastResults;
+  }
+
+  castShape(
+    shapePos: any,
+    shapeRot: any,
+    shapeVel: any,
+    shape: any,
+    maxToi: number,
+    filterFlags?: any,
+    filterGroups?: any,
+    filterExcludeCollider?: any,
+    filterExcludeRigidBody?: any,
+    filterPredicate?: any
+  ): any | null {
+    return null;
+  }
+
+  getRigidBody(handle: number): any | null {
+    return this.bodies.get(handle) || null;
+  }
+
+  getCollider(handle: number): any | null {
+    return this.colliders.get(handle) || null;
+  }
+
+  /**
+   * Set gravity for testing different environments
+   * @param gravity - Gravity vector
+   */
+  setGravity(gravity: { x: number; y: number; z: number }): void {
+    this.gravity = gravity;
+  }
+
+  /**
+   * Get current gravity
+   */
+  getGravity(): { x: number; y: number; z: number } {
+    return this.gravity;
+  }
+}
+
+/**
+ * Mock RigidBodyDesc for creating rigid bodies in tests
+ */
+class MockRigidBodyDesc {
+  _translation = { x: 0, y: 0, z: 0 };
+  _rotation = { x: 0, y: 0, z: 0, w: 1 };
+  _linvel = { x: 0, y: 0, z: 0 };
+  _angvel = { x: 0, y: 0, z: 0 };
+  _mass = 1.0;
+  _type = 'dynamic';
+
+  static dynamic(): MockRigidBodyDesc {
+    const desc = new MockRigidBodyDesc();
+    desc._type = 'dynamic';
+    return desc;
+  }
+
+  static fixed(): MockRigidBodyDesc {
+    const desc = new MockRigidBodyDesc();
+    desc._type = 'fixed';
+    return desc;
+  }
+
+  static kinematicPositionBased(): MockRigidBodyDesc {
+    const desc = new MockRigidBodyDesc();
+    desc._type = 'kinematicPositionBased';
+    return desc;
+  }
+
+  setTranslation(x: number, y: number, z: number): this {
+    this._translation = { x, y, z };
+    return this;
+  }
+
+  setRotation(quat: any): this {
+    this._rotation = quat;
+    return this;
+  }
+
+  setLinvel(x: number, y: number, z: number): this {
+    this._linvel = { x, y, z };
+    return this;
+  }
+
+  setAdditionalMass(mass: number): this {
+    this._mass = mass;
+    return this;
+  }
+
+  setLinearDamping(damping: number): this {
+    (this as any)._linearDamping = damping;
+    return this;
+  }
+
+  setAngularDamping(damping: number): this {
+    (this as any)._angularDamping = damping;
+    return this;
+  }
+
+  setCanSleep(canSleep: boolean): this {
+    (this as any)._canSleep = canSleep;
+    return this;
+  }
+}
+
+/**
+ * Mock ColliderDesc for creating colliders in tests
+ */
+class MockColliderDesc {
+  _shape = 'cuboid';
+  _friction = 0.5;
+  _restitution = 0.3;
+  _density = 1.0;
+  _dimensions: any = null;
+
+  static cuboid(hx: number, hy: number, hz: number): MockColliderDesc {
+    const desc = new MockColliderDesc();
+    desc._shape = 'cuboid';
+    desc._dimensions = { hx, hy, hz };
+    return desc;
+  }
+
+  static ball(radius: number): MockColliderDesc {
+    const desc = new MockColliderDesc();
+    desc._shape = 'ball';
+    desc._dimensions = { radius };
+    return desc;
+  }
+
+  static capsule(halfHeight: number, radius: number): MockColliderDesc {
+    const desc = new MockColliderDesc();
+    desc._shape = 'capsule';
+    desc._dimensions = { halfHeight, radius };
+    return desc;
+  }
+
+  static cylinder(halfHeight: number, radius: number): MockColliderDesc {
+    const desc = new MockColliderDesc();
+    desc._shape = 'cylinder';
+    desc._dimensions = { halfHeight, radius };
+    return desc;
+  }
+
+  setFriction(f: number): this {
+    this._friction = f;
+    return this;
+  }
+
+  setRestitution(r: number): this {
+    this._restitution = r;
+    return this;
+  }
+
+  setDensity(d: number): this {
+    this._density = d;
+    return this;
+  }
+}
+
+/**
+ * Mock Ray for raycasting in tests
+ */
+class MockRay {
+  origin: any;
+  dir: any;
+
+  constructor(origin: any, dir: any) {
+    this.origin = origin;
+    this.dir = dir;
+  }
+}
+
+// Mock Rapier module
+vi.mock('@dimforge/rapier3d-compat', () => ({
+  default: {
+    init: vi.fn(async () => Promise.resolve()),
+    World: MockRapierWorld,
+    RigidBodyDesc: MockRigidBodyDesc,
+    ColliderDesc: MockColliderDesc,
+    Ray: MockRay,
+  },
+}));
+
+// ============================================================================
+// BROWSER API MOCKS
+// ============================================================================
+
+// Mock window.addEventListener/removeEventListener with proper event handling
+const windowEventListeners = new Map<string, Set<EventListener>>();
+
+(global.window as any).addEventListener = vi.fn((type: string, listener: EventListener) => {
+  if (!windowEventListeners.has(type)) {
+    windowEventListeners.set(type, new Set());
+  }
+  windowEventListeners.get(type)!.add(listener);
+});
+
+(global.window as any).removeEventListener = vi.fn((type: string, listener: EventListener) => {
+  const listeners = windowEventListeners.get(type);
+  if (listeners) {
+    listeners.delete(listener);
+  }
+});
+
+// Override window.dispatchEvent to actually call registered listeners
+const originalDispatchEvent = global.window.dispatchEvent.bind(global.window);
+(global.window as any).dispatchEvent = vi.fn((event: Event) => {
+  const listeners = windowEventListeners.get(event.type);
+  if (listeners) {
+    listeners.forEach((listener) => {
+      if (typeof listener === 'function') {
+        listener(event);
+      } else {
+        listener.handleEvent(event);
+      }
+    });
+  }
+  return true;
+});
 
 // Mock document visibility API
 Object.defineProperty(document, 'hidden', {
@@ -135,6 +520,55 @@ Object.defineProperty(document, 'hidden', {
 
 global.document.addEventListener = vi.fn();
 global.document.removeEventListener = vi.fn();
+
+// Mock Gamepad API
+Object.defineProperty(navigator, 'getGamepads', {
+  writable: true,
+  value: vi.fn(() => []),
+});
+
+// Mock GamepadEvent
+(global as any).GamepadEvent = class GamepadEvent extends Event {
+  gamepad: Gamepad;
+
+  constructor(type: string, eventInitDict: { gamepad: Gamepad }) {
+    super(type);
+    this.gamepad = eventInitDict.gamepad;
+  }
+};
+
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value.toString();
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: vi.fn((index: number) => {
+      const keys = Object.keys(store);
+      return keys[index] || null;
+    }),
+  };
+})();
+
+Object.defineProperty(global, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+});
+
+// ============================================================================
+// CONSOLE MOCKS
+// ============================================================================
 
 // Console spy setup for test verification
 global.console.log = vi.fn();
