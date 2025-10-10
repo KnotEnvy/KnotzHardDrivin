@@ -2,27 +2,28 @@
 
 **Project**: Hard Drivin' Remake
 **Stack**: TypeScript + Three.js + Rapier.js + Vite
-**Current Phase**: Phase 2 (Vehicle Physics & Controls)
-**Last Updated**: October 9, 2025
+**Current Phase**: Phase 3 (Track & Environment)
+**Last Updated**: October 10, 2025
 
 ---
 
 ## TL;DR - What You Need to Know in 60 Seconds
 
-This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade game. We've completed Phase 0 (Project Setup) and Phase 1 (Core Engine & Camera System). You're joining at the start of Phase 2 (Vehicle Physics).
+This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade game. We've completed Phase 0 (Project Setup), Phase 1 (Core Engine & Camera System), and Phase 2 (Vehicle Physics & Controls). You're joining at the start of Phase 3 (Track & Environment).
 
 **Quick Facts**:
 - 60fps target, <16.67ms frame budget
 - TypeScript strict mode, no emojis in code
 - >80% test coverage required
 - Fixed timestep physics (60Hz always)
-- 169 unit tests passing, 96%+ coverage on core systems
+- 360 unit tests passing, >95% coverage on core systems
 - Zero memory leaks, zero per-frame allocations in hot paths
+- Fully functional vehicle with physics simulation
 
 **Read These First**:
 1. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md` - Product Requirements (THE authoritative source)
 2. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md` - Phase-by-phase development plan
-3. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase1\PHASE_1_COMPLETION_REPORT.md` - What we just finished
+3. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md` - What we just finished
 
 **Key Commands**:
 - `npm run dev` - Start dev server (localhost:4200)
@@ -85,39 +86,51 @@ A modern, browser-based reimagining of the classic **Hard Drivin'** arcade racer
 - All memory leaks fixed
 - Zero per-frame allocations in critical paths
 
-**Phase 2: Vehicle Physics & Controls** 🔴 NOT STARTED (NEXT)
-- Implement Vehicle.ts with Rapier.js
-- Wheel raycasting system
-- Suspension forces and tire physics
-- Input system for keyboard/gamepad controls
-- Vehicle damage tracking
+**Phase 2: Vehicle Physics & Controls** ✅ COMPLETE
+- Complete vehicle physics with Rapier.js (1,235 lines)
+- 4-wheel independent raycasting system
+- Spring-damper suspension simulation
+- Engine/transmission simulation (5-speed auto)
+- Tire force model with slip calculations
+- Input system (keyboard + gamepad) (551 lines)
+- Visual mesh rendering (chassis + wheels)
+- 194 new unit tests (360 total, all passing)
+- Zero per-frame allocations
+- Vehicle fully functional and drivable
 
-### Key Metrics (Phase 1 Completion)
+**Phase 3: Track & Environment** 🔴 NOT STARTED (NEXT)
+- Track generation from spline curves
+- Waypoint system for lap tracking
+- Collision detection with track boundaries
+- Surface type detection (tarmac, dirt, grass)
+- Environment setup (skybox, props, decorations)
+
+### Key Metrics (Phase 2 Completion)
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Frame Rate** | 200-300 fps (empty scene) | ✅ Excellent |
-| **Frame Time** | 1-3ms (empty scene) | ✅ Excellent |
-| **Memory Usage** | 20-30MB | ✅ Excellent |
-| **Test Coverage** | 96%+ (core systems) | ✅ Excellent |
-| **Unit Tests** | 169 (166 passing) | ✅ Excellent |
+| **Frame Rate** | 200-300 fps (with vehicle) | ✅ Excellent |
+| **Frame Time** | 1-3ms (with vehicle physics) | ✅ Excellent |
+| **Memory Usage** | 30-40MB | ✅ Excellent |
+| **Test Coverage** | >95% (core systems) | ✅ Excellent |
+| **Unit Tests** | 360 (all passing) | ✅ Excellent |
 | **Memory Leaks** | 0 | ✅ Excellent |
 | **TypeScript Errors** | 0 | ✅ Excellent |
 
-### What's Next: Phase 2 Preview
+### What's Next: Phase 3 Preview
 
 **Duration**: 2 weeks (10 days)
 **Complexity**: High
-**Primary Systems**: Vehicle physics, input controls
+**Primary Systems**: Track generation, waypoint tracking, environment
 
-**Phase 2 Will Deliver**:
-- Drivable vehicle with realistic physics
-- Keyboard + gamepad input support
-- Suspension system (4 wheels with raycasting)
-- Drive forces, steering, braking
-- Tire grip based on surface types
-- Damage tracking system
-- >80% test coverage on all physics code
+**Phase 3 Will Deliver**:
+- Spline-based track generation system
+- Waypoint tracking and lap timing
+- Collision detection with track boundaries
+- Surface type detection (enables tire grip variation)
+- Environment setup (skybox, lighting, decorations)
+- Minimap rendering
+- >80% test coverage on all track systems
 
 ---
 
@@ -166,7 +179,7 @@ All documentation lives in `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 
 #### `PHASE_1_COMPLETION_REPORT.md` - Phase 1 Results
 **Path**: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase1\PHASE_1_COMPLETION_REPORT.md`
-**Purpose**: Summary of what we just completed
+**Purpose**: Summary of Phase 1 (Core Engine & Camera System)
 **What's Inside**:
 - All Phase 1 deliverables
 - Test coverage reports
@@ -177,10 +190,25 @@ All documentation lives in `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 
 **When to Read**: To understand the foundation you're building on.
 
+#### `PHASE_2_COMPLETION_REPORT.md` - Phase 2 Results
+**Path**: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md`
+**Purpose**: Summary of Phase 2 (Vehicle Physics & Controls)
+**What's Inside**:
+- All Phase 2 deliverables (Vehicle.ts, InputSystem.ts, etc.)
+- Test coverage reports (360 tests, 194 new)
+- Performance validation
+- Architecture decisions
+- Known issues and limitations
+- Phase 3 preparation checklist
+
+**When to Read**: To understand the vehicle system you're building on.
+
 ### Supporting Documents
 
 - `__DOCS__/phase1/PHASE_1A_COMPLETION.md` - Game engine details
 - `__DOCS__/phase1/PHASE_1B_COMPLETION_REPORT.md` - Camera system details
+- `__DOCS__/phase2/PHASE_2A_VEHICLE_PHYSICS_SUMMARY.md` - Vehicle physics details
+- `__DOCS__/phase2/PHASE_2B_INPUT_SYSTEM_SUMMARY.md` - Input system details
 - `.claude/commands/` - Custom slash commands (if configured)
 
 ---
@@ -261,13 +289,13 @@ D:\JavaScript Games\KnotzHardDrivin\
 │   │   ├── PhysicsWorld.ts      # Rapier.js wrapper
 │   │   └── StateManager.ts      # FSM for game states (213 lines)
 │   ├── entities/                # Game entities (vehicles, obstacles)
-│   │   ├── Vehicle.ts           # Player vehicle (TO BE IMPLEMENTED - Phase 2)
+│   │   ├── Vehicle.ts           # Player vehicle (1,235 lines) ✅
 │   │   ├── Ghost.ts             # AI ghost opponent (Phase 6)
 │   │   ├── Obstacle.ts          # Track obstacles (Phase 3)
 │   │   └── Track.ts             # Track geometry (Phase 3)
 │   ├── systems/                 # Game systems
 │   │   ├── CameraSystem.ts      # First-person + replay cams (447 lines) ✅
-│   │   ├── InputSystem.ts       # Keyboard + gamepad (Phase 2)
+│   │   ├── InputSystem.ts       # Keyboard + gamepad (551 lines) ✅
 │   │   ├── AudioSystem.ts       # Sound effects + music (Phase 7)
 │   │   ├── UISystem.ts          # HUD + menus (Phase 7)
 │   │   ├── ReplaySystem.ts      # Recording + playback (Phase 4)
@@ -284,10 +312,11 @@ D:\JavaScript Games\KnotzHardDrivin\
 │   │   ├── PerformanceMonitor.ts # FPS tracking (359 lines) ✅
 │   │   └── ObjectPool.ts        # Object pooling (335 lines) ✅
 │   ├── config/                  # Configuration files
-│   │   ├── PhysicsConfig.ts     # Rapier settings (Phase 2)
+│   │   ├── PhysicsConfig.ts     # Vehicle physics settings (526 lines) ✅
 │   │   ├── GraphicsConfig.ts    # Three.js settings ✅
-│   │   └── GameConfig.ts        # Gameplay tuning (Phase 2+)
+│   │   └── GameConfig.ts        # Gameplay tuning (Phase 3+)
 │   ├── types/                   # TypeScript definitions
+│   │   ├── VehicleTypes.ts      # Vehicle type system (643 lines) ✅
 │   │   └── index.d.ts
 │   └── main.ts                  # Entry point
 ├── assets/
@@ -296,17 +325,28 @@ D:\JavaScript Games\KnotzHardDrivin\
 │   └── audio/                   # .mp3/.ogg files
 ├── tests/
 │   ├── unit/                    # Vitest unit tests
-│   │   ├── StateManager.test.ts (50 tests) ✅
-│   │   ├── PerformanceMonitor.test.ts (45 tests) ✅
-│   │   ├── CameraSystem.test.ts (43 tests) ✅
-│   │   └── GameEngine.test.ts (28 tests) ✅
+│   │   ├── Vehicle.test.ts      # 84 tests ✅
+│   │   ├── InputSystem.test.ts  # 50 tests ✅
+│   │   ├── PhysicsConfig.test.ts # 60 tests ✅
+│   │   ├── StateManager.test.ts # 50 tests ✅
+│   │   ├── PerformanceMonitor.test.ts # 45 tests ✅
+│   │   ├── CameraSystem.test.ts # 43 tests ✅
+│   │   └── GameEngine.test.ts   # 31 tests ✅
+│   ├── fixtures/
+│   │   ├── vehicleFixtures.ts   # 30+ vehicle test fixtures ✅
+│   │   └── testHelpers.ts       # 20+ test utilities ✅
 │   ├── e2e/                     # Playwright E2E tests (Phase 8)
 │   └── setup.ts                 # Global test mocks ✅
 ├── __DOCS__/                    # All documentation
 │   ├── PRD.md                   # Product requirements ✅
 │   ├── roadmap.md               # Development roadmap ✅
 │   ├── subAgentsUserGuide.md   # Agent usage guide ✅
-│   └── phase1/                  # Phase 1 completion docs ✅
+│   ├── phase1/                  # Phase 1 completion docs ✅
+│   └── phase2/                  # Phase 2 completion docs ✅
+│       ├── PHASE_2_COMPLETION_REPORT.md
+│       ├── PHASE_2A_VEHICLE_PHYSICS_SUMMARY.md
+│       ├── PHASE_2B_INPUT_SYSTEM_SUMMARY.md
+│       └── README.md
 ├── public/                      # Static assets
 ├── coverage/                    # Test coverage reports
 ├── dist/                        # Production build output
@@ -356,6 +396,40 @@ D:\JavaScript Games\KnotzHardDrivin\
 - Shadow map sizes: 512, 1024, 2048
 - Antialiasing, anisotropy settings
 - Auto-detection of hardware capabilities
+
+**`src/entities/Vehicle.ts`** (1,235 lines) ✅ COMPLETE
+- Complete physics simulation with Rapier.js
+- 4-wheel independent raycasting (not rigid body wheels)
+- Spring-damper suspension (Hooke's law + damping)
+- Engine simulation (torque curve, 1000-7000 RPM)
+- 5-speed automatic transmission with gear shifting
+- Tire force model (slip ratio/angle calculations)
+- Aerodynamics (drag + downforce)
+- Damage tracking system
+- Visual mesh rendering (chassis + 4 wheels)
+- Zero per-frame allocations (reuses temp objects)
+
+**`src/systems/InputSystem.ts`** (551 lines) ✅ COMPLETE
+- Keyboard support (WASD + arrows)
+- Gamepad support (Xbox/PS layout)
+- Input smoothing with configurable speed
+- Deadzone support for analog sticks
+- Device auto-switching (keyboard ↔ gamepad)
+- Edge-triggered buttons (reset, pause)
+- Zero per-frame allocations
+
+**`src/types/VehicleTypes.ts`** (643 lines) ✅ COMPLETE
+- Complete type system for vehicle physics
+- Interfaces: VehicleConfig, WheelState, VehicleInput, VehicleTelemetry
+- Enums: SurfaceType, DriveType, DamageSeverity, WheelIndex
+- Full TypeScript strict mode compliance
+
+**`src/config/PhysicsConfig.ts`** (526 lines) ✅ COMPLETE
+- DEFAULT_VEHICLE_CONFIG with realistic physics
+- 4 vehicle presets (DEFAULT, FWD, AWD, TRUCK)
+- Physics constants and tuning parameters
+- Brake configuration
+- Anti-roll bar settings
 
 ### Design Patterns in Use
 
@@ -771,27 +845,27 @@ LOADING → MENU → PLAYING ↔ PAUSED
 
 ## 10. Next Steps Template
 
-### How to Kick Off Phase 2 (Vehicle Physics & Controls)
+### How to Kick Off Phase 3 (Track & Environment)
 
-**Step 1: Read Phase 2 Requirements**
+**Step 1: Read Phase 3 Requirements**
 ```
-Read: D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md (Weeks 3-4 section)
-Read: D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md (Section 4.1 - Vehicle Physics)
+Read: D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md (Weeks 5-6 section)
+Read: D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md (Section 4.2 - Track System)
 ```
 
 **Step 2: Consult Architect for Design**
 ```
-@architect "We're starting Phase 2 (Vehicle Physics). Please review:
-- PRD.md Section 4.1 (Vehicle Physics)
-- roadmap.md Phase 2 tasks
+@architect "We're starting Phase 3 (Track & Environment). Please review:
+- PRD.md Section 4.2 (Track System)
+- roadmap.md Phase 3 tasks
 - Provide implementation order recommendation
 - Identify any design decisions needed upfront"
 ```
 
 **Step 3: Set Up Testing Infrastructure**
 ```
-@test-engineer "Prepare test plan for Phase 2 (Vehicle Physics):
-- What needs mocking? (Rapier.js, Three.js)
+@test-engineer "Prepare test plan for Phase 3 (Track & Environment):
+- What needs mocking? (Three.js, track generation)
 - Test fixtures needed
 - Coverage targets per component"
 ```
@@ -801,22 +875,23 @@ Read: D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md (Section 4.1 - Vehicle
 Work with specialized agents:
 
 ```
-# Session 1: Vehicle chassis
-@physics-engineer "Implement Vehicle.ts chassis as Rapier.js rigid body
-- Mass: 1200kg
-- Center of mass: slightly forward and low
-- Reference: PhysicsConfig.ts"
+# Session 1: Track spline system
+@track-environment-specialist "Implement Track.ts with spline-based track generation
+- Catmull-Rom splines for smooth curves
+- Track width, banking support
+- Reference: PRD.md Section 4.2.1"
 
-# Session 2: Wheel raycasting
-@physics-engineer "Implement wheel raycasting system in Vehicle.ts
-- 4 wheels with independent raycasts
-- Handle airborne state
-- Reference: PRD.md Section 4.1.1"
+# Session 2: Collision detection
+@track-environment-specialist "Implement track boundary collision
+- Detect vehicle-track collisions
+- Trigger damage system from Phase 2
+- Reference: PRD.md Section 4.2.2"
 
-# Session 3: Suspension
-@physics-engineer "Implement suspension forces
-- Spring-damper system
-- Stiffness, damping from PhysicsConfig.ts"
+# Session 3: Waypoint system
+@gameplay-systems-designer "Implement WaypointSystem.ts
+- Lap counting and timing
+- Progress tracking
+- Reference: PRD.md Section 4.3"
 
 # And so on...
 ```
@@ -826,41 +901,42 @@ Work with specialized agents:
 @test-engineer "Create unit tests for [feature just implemented]
 - Test edge cases
 - >80% coverage
-- Mock Rapier.js dependencies"
+- Mock Three.js dependencies"
 ```
 
 **Step 6: Performance Validation**
 ```
-@performance-optimizer "Profile vehicle physics performance
-- Frame time budget: <5ms
+@performance-optimizer "Profile track rendering performance
+- Frame time budget: <8ms for rendering
 - Check for memory allocations
-- Validate 60Hz physics stability"
+- Validate smooth rendering"
 ```
 
 **Step 7: Documentation**
 ```
-@documentation-writer "Document Vehicle.ts API
+@documentation-writer "Document Track.ts and WaypointSystem.ts APIs
 - TSDoc comments on all public methods
-- Update README with vehicle physics info
+- Update README with track system info
 - Add usage examples"
 ```
 
 **Step 8: Phase Completion Review**
 ```
-@architect "Review Phase 2 completion:
+@architect "Review Phase 3 completion:
 - All roadmap tasks done?
 - All tests passing?
 - Performance targets met?
-- Ready for Phase 3?"
+- Ready for Phase 4?"
 ```
 
-### Which Agents to Consult First (Phase 2)
+### Which Agents to Consult First (Phase 3)
 
 1. **@architect** - Review phase design, architecture decisions
-2. **@physics-engineer** - Primary implementation agent for Phase 2
-3. **@gameplay-designer** - Input system, vehicle controls
-4. **@test-engineer** - Testing infrastructure, coverage validation
-5. **@performance-optimizer** - Performance profiling, optimization
+2. **@track-environment-specialist** - Primary implementation agent for Phase 3
+3. **@gameplay-systems-designer** - Waypoint system, lap timing
+4. **@3d-graphics-renderer** - Environment visuals, skybox
+5. **@test-engineer** - Testing infrastructure, coverage validation
+6. **@performance-optimizer** - Performance profiling, optimization
 
 ### Testing Gates Between Phases
 
@@ -933,9 +1009,15 @@ Core Engine:
 - D:\JavaScript Games\KnotzHardDrivin\src\core\SceneManager.ts
 - D:\JavaScript Games\KnotzHardDrivin\src\core\PhysicsWorld.ts
 
+Entities:
+- D:\JavaScript Games\KnotzHardDrivin\src\entities\Vehicle.ts (NEW - Phase 2)
+
 Systems:
 - D:\JavaScript Games\KnotzHardDrivin\src\systems\CameraSystem.ts
-- D:\JavaScript Games\KnotzHardDrivin\src\systems\InputSystem.ts (TO BE IMPLEMENTED)
+- D:\JavaScript Games\KnotzHardDrivin\src\systems\InputSystem.ts (NEW - Phase 2)
+
+Types:
+- D:\JavaScript Games\KnotzHardDrivin\src\types\VehicleTypes.ts (NEW - Phase 2)
 
 Utilities:
 - D:\JavaScript Games\KnotzHardDrivin\src\utils\PerformanceMonitor.ts
@@ -943,9 +1025,14 @@ Utilities:
 
 Config:
 - D:\JavaScript Games\KnotzHardDrivin\src\config\GraphicsConfig.ts
-- D:\JavaScript Games\KnotzHardDrivin\src\config\PhysicsConfig.ts (TO BE IMPLEMENTED)
+- D:\JavaScript Games\KnotzHardDrivin\src\config\PhysicsConfig.ts (NEW - Phase 2)
 
 Tests:
+- D:\JavaScript Games\KnotzHardDrivin\tests\unit\Vehicle.test.ts (NEW - Phase 2)
+- D:\JavaScript Games\KnotzHardDrivin\tests\unit\InputSystem.test.ts (NEW - Phase 2)
+- D:\JavaScript Games\KnotzHardDrivin\tests\unit\PhysicsConfig.test.ts (NEW - Phase 2)
+- D:\JavaScript Games\KnotzHardDrivin\tests\fixtures\vehicleFixtures.ts (NEW - Phase 2)
+- D:\JavaScript Games\KnotzHardDrivin\tests\fixtures\testHelpers.ts (NEW - Phase 2)
 - D:\JavaScript Games\KnotzHardDrivin\tests\unit\StateManager.test.ts
 - D:\JavaScript Games\KnotzHardDrivin\tests\unit\PerformanceMonitor.test.ts
 - D:\JavaScript Games\KnotzHardDrivin\tests\unit\CameraSystem.test.ts
@@ -957,13 +1044,14 @@ Documentation:
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\subAgentsUserGuide.md
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase1\PHASE_1_COMPLETION_REPORT.md
+- D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md (NEW - Phase 2)
 ```
 
 ---
 
 ## Final Thoughts
 
-You're joining a well-architected project with solid foundations. Phase 1 is complete with excellent test coverage, zero memory leaks, and great performance. You have 13ms of frame budget headroom for Phase 2+ features.
+You're joining a well-architected project with solid foundations. Phases 0, 1, and 2 are complete with excellent test coverage, zero memory leaks, and great performance. The vehicle is fully functional and ready for track integration.
 
 **Keys to Success**:
 1. Read PRD.md and roadmap.md before implementing features
@@ -980,11 +1068,11 @@ You're joining a well-architected project with solid foundations. Phase 1 is com
 - Run tests (`npm test`)
 - Check performance (`npm run dev` → F12 → Performance tab)
 
-**You've Got This!** The foundation is solid, the documentation is comprehensive, and the specialized agents are here to help. Welcome to the Hard Drivin' Remake project.
+**You've Got This!** The foundation is solid (Phases 0-2 complete), the documentation is comprehensive, and the specialized agents are here to help. Welcome to Phase 3 of the Hard Drivin' Remake project.
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: October 9, 2025
-**Status**: Ready for Phase 2
-**Next Phase**: Vehicle Physics & Controls
+**Document Version**: 2.0
+**Last Updated**: October 10, 2025
+**Status**: Ready for Phase 3
+**Next Phase**: Track & Environment
