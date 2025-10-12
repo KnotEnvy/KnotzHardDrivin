@@ -449,6 +449,11 @@ class MockColliderDesc {
     this._density = d;
     return this;
   }
+
+  setCollisionGroups(groups: number): this {
+    (this as any)._collisionGroups = groups;
+    return this;
+  }
 }
 
 /**
@@ -574,3 +579,373 @@ Object.defineProperty(global, 'localStorage', {
 global.console.log = vi.fn();
 global.console.warn = vi.fn();
 global.console.error = vi.fn();
+
+// ============================================================================
+// PHASE 3: THREE.JS GEOMETRY MOCKS (Track System)
+// ============================================================================
+
+/**
+ * Mock BufferGeometry for track mesh generation testing
+ */
+class MockBufferGeometry {
+  attributes: Map<string, any> = new Map();
+  index: any = null;
+  boundingBox: any = null;
+  boundingSphere: any = null;
+
+  setAttribute(name: string, attribute: any): this {
+    this.attributes.set(name, attribute);
+    return this;
+  }
+
+  getAttribute(name: string): any {
+    return this.attributes.get(name);
+  }
+
+  deleteAttribute(name: string): this {
+    this.attributes.delete(name);
+    return this;
+  }
+
+  hasAttribute(name: string): boolean {
+    return this.attributes.has(name);
+  }
+
+  setIndex(index: any): this {
+    this.index = index;
+    return this;
+  }
+
+  computeVertexNormals(): void {
+    // Mock normal computation - does nothing in tests
+  }
+
+  computeBoundingBox(): void {
+    // Mock bounding box computation
+    this.boundingBox = {
+      min: { x: -10, y: 0, z: -10 },
+      max: { x: 10, y: 1, z: 10 },
+    };
+  }
+
+  computeBoundingSphere(): void {
+    // Mock bounding sphere computation
+    this.boundingSphere = {
+      center: { x: 0, y: 0.5, z: 0 },
+      radius: 15,
+    };
+  }
+
+  dispose(): void {
+    this.attributes.clear();
+    this.index = null;
+  }
+
+  clone(): MockBufferGeometry {
+    const cloned = new MockBufferGeometry();
+    this.attributes.forEach((value, key) => {
+      cloned.setAttribute(key, value);
+    });
+    cloned.index = this.index;
+    return cloned;
+  }
+}
+
+/**
+ * Mock BufferAttribute for geometry attribute testing
+ */
+class MockBufferAttribute {
+  array: Float32Array | Uint32Array | Uint16Array;
+  itemSize: number;
+  count: number;
+  private _needsUpdate: boolean = false;
+
+  constructor(array: Float32Array | Uint32Array | Uint16Array, itemSize: number) {
+    this.array = array;
+    this.itemSize = itemSize;
+    this.count = array.length / itemSize;
+  }
+
+  get needsUpdate(): boolean {
+    return this._needsUpdate;
+  }
+
+  set needsUpdate(value: boolean) {
+    this._needsUpdate = value;
+  }
+
+  clone(): MockBufferAttribute {
+    return new MockBufferAttribute(this.array.slice() as any, this.itemSize);
+  }
+}
+
+/**
+ * Mock Float32BufferAttribute
+ */
+class MockFloat32BufferAttribute extends MockBufferAttribute {
+  constructor(array: Float32Array | number[], itemSize: number) {
+    const typedArray = array instanceof Float32Array ? array : new Float32Array(array);
+    super(typedArray, itemSize);
+  }
+}
+
+/**
+ * Mock Uint32BufferAttribute
+ */
+class MockUint32BufferAttribute extends MockBufferAttribute {
+  constructor(array: Uint32Array | number[], itemSize: number) {
+    const typedArray = array instanceof Uint32Array ? array : new Uint32Array(array);
+    super(typedArray, itemSize);
+  }
+}
+
+/**
+ * Mock Uint16BufferAttribute
+ */
+class MockUint16BufferAttribute extends MockBufferAttribute {
+  constructor(array: Uint16Array | number[], itemSize: number) {
+    const typedArray = array instanceof Uint16Array ? array : new Uint16Array(array);
+    super(typedArray, itemSize);
+  }
+}
+
+/**
+ * Mock CatmullRomCurve3 for track spline generation
+ */
+class MockCatmullRomCurve3 {
+  points: any[];
+  closed: boolean;
+  curveType: string;
+  tension: number;
+
+  constructor(points: any[] = [], closed: boolean = false, curveType: string = 'centripetal', tension: number = 0.5) {
+    this.points = points;
+    this.closed = closed;
+    this.curveType = curveType;
+    this.tension = tension;
+  }
+
+  /**
+   * Get points along the curve
+   * @param divisions - Number of points to generate
+   * @returns Array of Vector3 points
+   */
+  getPoints(divisions: number = 50): any[] {
+    if (this.points.length < 2) return [];
+
+    const points: any[] = [];
+    const segments = this.closed ? divisions : divisions;
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const point = this.getPoint(t);
+      points.push(point);
+    }
+
+    return points;
+  }
+
+  /**
+   * Get point at parameter t (0 to 1)
+   * @param t - Parameter (0 = start, 1 = end)
+   * @returns Vector3 point on curve
+   */
+  getPoint(t: number): any {
+    if (this.points.length === 0) {
+      return { x: 0, y: 0, z: 0 };
+    }
+
+    // Simple linear interpolation for testing
+    // Real CatmullRom would use cubic interpolation
+    const scaledT = t * (this.points.length - 1);
+    const index = Math.floor(scaledT);
+    const localT = scaledT - index;
+
+    if (index >= this.points.length - 1) {
+      return this.points[this.points.length - 1];
+    }
+
+    const p0 = this.points[index];
+    const p1 = this.points[index + 1];
+
+    return {
+      x: p0.x + (p1.x - p0.x) * localT,
+      y: p0.y + (p1.y - p0.y) * localT,
+      z: p0.z + (p1.z - p0.z) * localT,
+    };
+  }
+
+  /**
+   * Get tangent at parameter t
+   * @param t - Parameter (0 = start, 1 = end)
+   * @returns Normalized tangent vector
+   */
+  getTangent(t: number): any {
+    const epsilon = 0.001;
+    const t1 = Math.max(0, t - epsilon);
+    const t2 = Math.min(1, t + epsilon);
+
+    const p1 = this.getPoint(t1);
+    const p2 = this.getPoint(t2);
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dz = p2.z - p1.z;
+
+    const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    if (length === 0) {
+      return { x: 0, y: 0, z: 1 };
+    }
+
+    return {
+      x: dx / length,
+      y: dy / length,
+      z: dz / length,
+    };
+  }
+
+  /**
+   * Get length of curve
+   * @returns Approximate curve length
+   */
+  getLength(): number {
+    let length = 0;
+    const divisions = 100;
+
+    for (let i = 0; i < divisions; i++) {
+      const p1 = this.getPoint(i / divisions);
+      const p2 = this.getPoint((i + 1) / divisions);
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const dz = p2.z - p1.z;
+
+      length += Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    return length;
+  }
+}
+
+/**
+ * Mock TextureLoader for track texture loading
+ */
+class MockTextureLoader {
+  load(url: string, onLoad?: (texture: any) => void, onProgress?: (event: any) => void, onError?: (error: any) => void): any {
+    const mockTexture = {
+      image: {
+        width: 512,
+        height: 512,
+      },
+      needsUpdate: true,
+      wrapS: 1000, // THREE.RepeatWrapping
+      wrapT: 1000,
+      minFilter: 1008, // THREE.LinearMipmapLinearFilter
+      magFilter: 1006, // THREE.LinearFilter
+      dispose: vi.fn(),
+    };
+
+    if (onLoad) {
+      setTimeout(() => onLoad(mockTexture), 0);
+    }
+
+    return mockTexture;
+  }
+
+  loadAsync(url: string): Promise<any> {
+    return new Promise((resolve) => {
+      resolve(this.load(url));
+    });
+  }
+}
+
+/**
+ * Mock OrthographicCamera for minimap rendering
+ */
+class MockOrthographicCamera {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  near: number;
+  far: number;
+  position: any = { x: 0, y: 0, z: 0, set: vi.fn() };
+  rotation: any = { x: 0, y: 0, z: 0 };
+  quaternion: any = { x: 0, y: 0, z: 0, w: 1 };
+
+  constructor(left: number, right: number, top: number, bottom: number, near: number, far: number) {
+    this.left = left;
+    this.right = right;
+    this.top = top;
+    this.bottom = bottom;
+    this.near = near;
+    this.far = far;
+  }
+
+  lookAt(x: number | any, y?: number, z?: number): void {
+    // Mock lookAt - does nothing in tests
+  }
+
+  updateProjectionMatrix(): void {
+    // Mock projection matrix update
+  }
+}
+
+/**
+ * Mock WebGLRenderTarget for minimap texture generation
+ */
+class MockWebGLRenderTarget {
+  width: number;
+  height: number;
+  texture: any;
+
+  constructor(width: number, height: number, options?: any) {
+    this.width = width;
+    this.height = height;
+    this.texture = {
+      image: {
+        width,
+        height,
+      },
+      needsUpdate: true,
+      dispose: vi.fn(),
+    };
+  }
+
+  dispose(): void {
+    this.texture.dispose();
+  }
+}
+
+// Extend Rapier mock with trimesh support for track collision
+class MockTrimeshColliderDesc extends MockColliderDesc {
+  static trimesh(vertices: Float32Array, indices: Uint32Array): MockTrimeshColliderDesc {
+    const desc = new MockTrimeshColliderDesc() as any;
+    desc._shape = 'trimesh';
+    desc._dimensions = { vertices, indices };
+    return desc;
+  }
+
+  static cone(halfHeight: number, radius: number): MockColliderDesc {
+    const desc = new MockColliderDesc();
+    desc._shape = 'cone';
+    desc._dimensions = { halfHeight, radius };
+    return desc;
+  }
+}
+
+// Add trimesh to Rapier mock
+(MockColliderDesc as any).trimesh = MockTrimeshColliderDesc.trimesh;
+(MockColliderDesc as any).cone = MockTrimeshColliderDesc.cone;
+
+// Export mocks for use in tests (via global for now)
+(global as any).MockBufferGeometry = MockBufferGeometry;
+(global as any).MockBufferAttribute = MockBufferAttribute;
+(global as any).MockFloat32BufferAttribute = MockFloat32BufferAttribute;
+(global as any).MockUint32BufferAttribute = MockUint32BufferAttribute;
+(global as any).MockUint16BufferAttribute = MockUint16BufferAttribute;
+(global as any).MockCatmullRomCurve3 = MockCatmullRomCurve3;
+(global as any).MockTextureLoader = MockTextureLoader;
+(global as any).MockOrthographicCamera = MockOrthographicCamera;
+(global as any).MockWebGLRenderTarget = MockWebGLRenderTarget;

@@ -57,7 +57,7 @@ export const PHYSICS_CONSTANTS = {
    * Angular damping to prevent spinning (0-1).
    * Applied to angular velocity each frame.
    */
-  ANGULAR_DAMPING: 0.05,
+  ANGULAR_DAMPING: 0.15,
 
   /**
    * Minimum velocity threshold for sleep (m/s).
@@ -118,8 +118,8 @@ const DEFAULT_TRANSMISSION: TransmissionConfig = {
  */
 const DEFAULT_TIRE: TireConfig = {
   maxGripLongitudinal: 12000, // Newtons (forward/backward)
-  maxGripLateral: 10000, // Newtons (side-to-side)
-  stiffness: 8.0, // Grip builds quickly with slip
+  maxGripLateral: 8000, // Newtons (side-to-side) - reduced for stability
+  stiffness: 4.0, // Reduced for smoother handling and stability
   surfaceGripMultipliers: {
     [SurfaceType.TARMAC]: 1.0, // Full grip
     [SurfaceType.DIRT]: 0.6, // 60% grip

@@ -187,30 +187,30 @@ export class SceneManager {
    * This will be removed once vehicle system is implemented.
    */
   private createTestScene(): void {
-    // Ground plane
-    const groundGeometry = new THREE.PlaneGeometry(200, 200);
-    const groundMaterial = new THREE.MeshStandardMaterial({
-      color: 0x808080,
-      roughness: 0.8,
-      metalness: 0.2,
-    });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
+    // Ground plane (commented out - track provides ground now)
+    // const groundGeometry = new THREE.PlaneGeometry(200, 200);
+    // const groundMaterial = new THREE.MeshStandardMaterial({
+    //   color: 0x808080,
+    //   roughness: 0.8,
+    //   metalness: 0.2,
+    // });
+    // const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    // ground.rotation.x = -Math.PI / 2;
+    // ground.receiveShadow = true;
+    // this.scene.add(ground);
 
-    // Test cube (will be controlled to test camera following)
-    const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
-    const cubeMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00ff00,
-      roughness: 0.5,
-      metalness: 0.5,
-    });
-    this.testCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    this.testCube.position.set(0, 1, 0);
-    this.testCube.castShadow = true;
-    this.testCube.receiveShadow = true;
-    this.scene.add(this.testCube);
+    // Test cube (commented out - vehicle replaces this)
+    // const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+    // const cubeMaterial = new THREE.MeshStandardMaterial({
+    //   color: 0x00ff00,
+    //   roughness: 0.5,
+    //   metalness: 0.5,
+    // });
+    // this.testCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    // this.testCube.position.set(0, 1, 0);
+    // this.testCube.castShadow = true;
+    // this.testCube.receiveShadow = true;
+    // this.scene.add(this.testCube);
 
     // Add some reference objects for spatial awareness
     this.createReferenceGrid();

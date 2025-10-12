@@ -104,6 +104,9 @@ export class Vehicle {
   // Cached transform for external access
   private cachedTransform: VehicleTransform;
 
+  // Previous velocity for G-force calculation
+  private prevVelocity: Vector3 = new Vector3();
+
   // Temp objects for calculations (zero per-frame allocations)
   private temp: PhysicsTempObjects;
 
@@ -276,13 +279,16 @@ export class Vehicle {
     // 9. Update RPM based on wheel speed
     this.updateRPM(deltaTime);
 
-    // 10. Clamp velocities to prevent instability
+    // 10. Apply stability control
+    this.applyStabilityControl(deltaTime);
+
+    // 11. Clamp velocities to prevent instability
     this.clampVelocities();
 
-    // 11. Update damage state
+    // 12. Update damage state
     this.updateDamage(deltaTime);
 
-    // 12. Update visual meshes to match physics
+    // 13. Update visual meshes to match physics
     this.updateVisuals();
   }
 
@@ -677,14 +683,21 @@ export class Vehicle {
         // Integrate rotation angle
         wheel.rotationAngle += wheel.angularVelocity * deltaTime;
 
-        // Wrap to 0-2PI
-        if (wheel.rotationAngle > Math.PI * 2) {
-          wheel.rotationAngle -= Math.PI * 2;
+        // Wrap to 0-2PI (handle both positive and negative overflow)
+        wheel.rotationAngle = wheel.rotationAngle % (Math.PI * 2);
+        if (wheel.rotationAngle < 0) {
+          wheel.rotationAngle += Math.PI * 2;
         }
       } else {
         // Slow down rotation when airborne or stopped
         wheel.angularVelocity *= 0.95;
         wheel.rotationAngle += wheel.angularVelocity * deltaTime;
+
+        // Wrap rotation angle to prevent overflow
+        wheel.rotationAngle = wheel.rotationAngle % (Math.PI * 2);
+        if (wheel.rotationAngle < 0) {
+          wheel.rotationAngle += Math.PI * 2;
+        }
       }
     }
   }
@@ -728,27 +741,50 @@ export class Vehicle {
         continue;
       }
 
-      // Calculate wheel velocity in world space
-      const wheelWorldPos = this.temp.tempVec1
-        .copy(config.position)
+      // Calculate wheel position in world space
+      const wheelLocalPos = this.temp.tempVec1.copy(config.position);
+      const wheelWorldPos = this.temp.tempVec2
+        .copy(wheelLocalPos)
         .applyQuaternion(this.cachedTransform.rotation)
         .add(this.cachedTransform.position);
 
-      const wheelVel = this.temp.tempVec2.set(0, 0, 0); // TODO: get velocity at wheel point
+      // Get velocity at wheel point (linear + angular contribution)
+      // v_point = v_center + w × r
+      const angularVel = this.cachedTransform.angularVelocity;
+      const radiusVector = this.temp.tempVec3
+        .copy(wheelWorldPos)
+        .sub(this.cachedTransform.position);
+      const angularContribution = this.temp.tempVec4
+        .copy(angularVel)
+        .cross(radiusVector);
+      const wheelVel = this.temp.tempVec5
+        .copy(this.cachedTransform.linearVelocity)
+        .add(angularContribution);
 
       // Get wheel forward direction (includes steering)
-      const wheelForward = this.temp.tempVec3.set(0, 0, 1);
-      if (config.isSteerable) {
-        wheelForward.applyAxisAngle(this.temp.tempVec4.set(0, 1, 0), wheel.steeringAngle);
-      }
-      wheelForward.applyQuaternion(this.cachedTransform.rotation).normalize();
+      // Start with vehicle forward direction (0, 0, 1 in local space)
+      const wheelForward = this.temp.tempVec6.set(0, 0, 1);
 
-      // Get wheel right direction
-      const wheelRight = this.temp.tempVec4.crossVectors(wheelForward, wheel.contactNormal).normalize();
+      // Apply steering rotation in vehicle's local coordinate system
+      if (config.isSteerable) {
+        // Create rotation quaternion around vehicle's up axis
+        const steeringQuat = this.temp.tempQuat1.setFromAxisAngle(
+          this.cachedTransform.up,
+          wheel.steeringAngle
+        );
+        // Apply steering rotation to vehicle forward
+        wheelForward.applyQuaternion(this.cachedTransform.rotation).applyQuaternion(steeringQuat).normalize();
+      } else {
+        // No steering, just use vehicle forward
+        wheelForward.applyQuaternion(this.cachedTransform.rotation).normalize();
+      }
+
+      // Get wheel right direction (perpendicular to forward and contact normal)
+      const wheelRight = this.temp.tempVec3.crossVectors(wheel.contactNormal, wheelForward).normalize();
 
       // Project velocity onto wheel axes
-      const forwardVel = this.cachedTransform.linearVelocity.dot(wheelForward);
-      const lateralVel = this.cachedTransform.linearVelocity.dot(wheelRight);
+      const forwardVel = wheelVel.dot(wheelForward);
+      const lateralVel = wheelVel.dot(wheelRight);
 
       // Calculate slip ratio and angle
       const wheelSpeed = wheel.angularVelocity * config.radius;
@@ -781,16 +817,24 @@ export class Vehicle {
       const maxGrip = this.config.tire.maxGripLongitudinal * gripMultiplier * damageMultiplier;
       longitudinalForce = Math.max(-maxGrip, Math.min(maxGrip, longitudinalForce));
 
-      // Calculate lateral force (cornering)
+      // Calculate lateral force (cornering) with proper grip circle
       const lateralGrip = this.config.tire.maxGripLateral * gripMultiplier * damageMultiplier;
-      const lateralForce = -lateralVel * this.config.tire.stiffness;
-      const clampedLateralForce = Math.max(-lateralGrip, Math.min(lateralGrip, lateralForce));
 
-      // Combine forces
-      const tireForceVec = this.temp.tempVec5
+      // Simple lateral force model: F = -stiffness * lateralVel
+      // The negative sign makes it resist lateral motion (brings velocity back to wheel forward)
+      let lateralForce = -lateralVel * this.config.tire.stiffness * 1000; // Scale stiffness for proper magnitude
+
+      // Clamp to available lateral grip (reduced by longitudinal force usage - grip circle)
+      // Total grip circle: sqrt(long^2 + lat^2) <= maxGrip
+      const longitudinalGripUsage = Math.abs(longitudinalForce) / (maxGrip + 0.001);
+      const availableLateralGrip = lateralGrip * Math.sqrt(1.0 - Math.min(0.9, longitudinalGripUsage * longitudinalGripUsage));
+      lateralForce = Math.max(-availableLateralGrip, Math.min(availableLateralGrip, lateralForce));
+
+      // Combine forces in wheel coordinate system
+      const tireForceVec = this.temp.tempVec1
         .copy(wheelForward)
         .multiplyScalar(longitudinalForce)
-        .addScaledVector(wheelRight, clampedLateralForce);
+        .addScaledVector(wheelRight, lateralForce);
 
       wheel.tireForce.copy(tireForceVec);
 
@@ -973,6 +1017,56 @@ export class Vehicle {
   }
 
   /**
+   * Applies stability control to prevent vehicle from flipping over.
+   * This adds a corrective torque when the vehicle tilts too much.
+   */
+  private applyStabilityControl(deltaTime: number): void {
+    // Get vehicle's up vector
+    const up = this.cachedTransform.up;
+    const worldUp = this.temp.tempVec1.set(0, 1, 0);
+
+    // Calculate how much the vehicle is tilted from vertical
+    const tiltDot = up.dot(worldUp);
+
+    // If tilted significantly (tiltDot < 1), apply corrective torque
+    if (tiltDot < 0.95) {
+      // Calculate axis to rotate around (perpendicular to both up vectors)
+      const correctionAxis = this.temp.tempVec2.crossVectors(up, worldUp).normalize();
+
+      // Calculate correction strength based on tilt amount
+      const tiltAngle = Math.acos(Math.max(-1, Math.min(1, tiltDot)));
+      const correctionStrength = tiltAngle * 2000; // Torque magnitude
+
+      // Apply corrective torque
+      const correctionTorque = this.temp.tempVec3
+        .copy(correctionAxis)
+        .multiplyScalar(correctionStrength * deltaTime);
+
+      this.rigidBody.applyTorqueImpulse(
+        { x: correctionTorque.x, y: correctionTorque.y, z: correctionTorque.z },
+        true
+      );
+    }
+
+    // Damp excessive roll (rotation around forward axis)
+    const angVel = this.cachedTransform.angularVelocity;
+    const forward = this.cachedTransform.forward;
+    const rollVelocity = angVel.dot(forward);
+
+    if (Math.abs(rollVelocity) > 0.5) {
+      // Apply counter-torque to reduce roll
+      const rollDampingTorque = this.temp.tempVec4
+        .copy(forward)
+        .multiplyScalar(-rollVelocity * 500 * deltaTime);
+
+      this.rigidBody.applyTorqueImpulse(
+        { x: rollDampingTorque.x, y: rollDampingTorque.y, z: rollDampingTorque.z },
+        true
+      );
+    }
+  }
+
+  /**
    * Clamps velocities to prevent instability.
    */
   private clampVelocities(): void {
@@ -986,17 +1080,40 @@ export class Vehicle {
         true
       );
     }
+
+    // Also clamp angular velocity to prevent excessive spinning
+    const angvel = this.rigidBody.angvel();
+    const angSpeed = Math.sqrt(angvel.x * angvel.x + angvel.y * angvel.y + angvel.z * angvel.z);
+    const maxAngVel = 10.0; // rad/s
+
+    if (angSpeed > maxAngVel) {
+      const scale = maxAngVel / angSpeed;
+      this.rigidBody.setAngvel(
+        { x: angvel.x * scale, y: angvel.y * scale, z: angvel.z * scale },
+        true
+      );
+    }
   }
 
   /**
    * Calculates current g-force for crash detection.
+   * G-force = acceleration / 9.81 m/s²
+   * Acceleration = (current velocity - previous velocity) / deltaTime
    */
   private calculateGForce(): number {
-    // Simplified: acceleration = change in velocity / time
-    // G-force = acceleration / 9.81
-    const speed = this.cachedTransform.linearVelocity.length();
-    const gForce = speed / PHYSICS_CONSTANTS.FIXED_TIMESTEP / PHYSICS_CONSTANTS.GRAVITY;
-    return Math.abs(gForce);
+    const currentVel = this.cachedTransform.linearVelocity;
+
+    // Calculate acceleration: Δv / Δt
+    const acceleration = this.temp.tempVec1
+      .copy(currentVel)
+      .sub(this.prevVelocity)
+      .divideScalar(PHYSICS_CONSTANTS.FIXED_TIMESTEP);
+
+    // Update previous velocity for next frame
+    this.prevVelocity.copy(currentVel);
+
+    // G-force = |acceleration| / 9.81
+    return acceleration.length() / PHYSICS_CONSTANTS.GRAVITY;
   }
 
   /**

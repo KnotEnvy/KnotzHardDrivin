@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera Test - Hard Drivin'</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+    }
+    #game-canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+    #debug-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #0f0;
+      padding: 15px;
+      font-size: 12px;
+      border: 2px solid #0f0;
+      max-width: 400px;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    #debug-panel h3 {
+      margin: 0 0 10px 0;
+      color: #0ff;
+    }
+    .debug-section {
+      margin-bottom: 10px;
+      padding: 5px;
+      border-left: 2px solid #0f0;
+      padding-left: 10px;
+    }
+    .label {
+      color: #ff0;
+      font-weight: bold;
+    }
+    .value {
+      color: #0f0;
+      font-family: monospace;
+    }
+    #instructions {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 15px;
+      font-size: 14px;
+      border: 2px solid #fff;
+      max-width: 500px;
+      z-index: 1000;
+    }
+    #instructions h4 {
+      margin: 0 0 10px 0;
+      color: #0ff;
+    }
+    #instructions ul {
+      margin: 5px 0;
+      padding-left: 20px;
+    }
+    #instructions li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="debug-panel">
+    <h3>Camera Debug Panel</h3>
+    <div class="debug-section">
+      <div><span class="label">Mode:</span> <span class="value" id="mode">-</span></div>
+      <div><span class="label">Transitioning:</span> <span class="value" id="transitioning">-</span></div>
+    </div>
+    <div class="debug-section">
+      <div><span class="label">Position:</span></div>
+      <div class="value" id="position">-</div>
+      <div><span class="label">Rotation (rad):</span></div>
+      <div class="value" id="rotation">-</div>
+    </div>
+    <div class="debug-section">
+      <div><span class="label">Look-At:</span></div>
+      <div class="value" id="lookat">-</div>
+    </div>
+    <div class="debug-section">
+      <div><span class="label">Vehicle Position:</span></div>
+      <div class="value" id="vehicle-pos">-</div>
+      <div><span class="label">Vehicle Speed:</span></div>
+      <div class="value" id="vehicle-speed">-</div>
+    </div>
+  </div>
+
+  <div id="instructions">
+    <h4>Camera Test Instructions</h4>
+    <ul>
+      <li><strong>[W/↑]</strong> - Accelerate</li>
+      <li><strong>[S/↓]</strong> - Brake</li>
+      <li><strong>[A/←]</strong> - Steer Left</li>
+      <li><strong>[D/→]</strong> - Steer Right</li>
+      <li><strong>[Space]</strong> - Handbrake</li>
+      <li><strong>[R]</strong> - Reset Vehicle</li>
+      <li><strong>[1]</strong> - First Person Camera</li>
+      <li><strong>[2]</strong> - Chase Camera (Default)</li>
+      <li><strong>[3]</strong> - Replay Camera</li>
+    </ul>
+    <div style="margin-top: 10px; color: #ff0;">
+      Expected: Track grounded, vehicle visible from behind, sky above
+    </div>
+  </div>
+
+  <script type="module">
+    import { GameEngine, GameState } from './src/core/GameEngine.js';
+    import { CameraMode } from './src/systems/CameraSystem.js';
+
+    const engine = new GameEngine();
+    window.gameEngine = engine;
+
+    // Start engine
+    await engine.start();
+    engine.setState(GameState.PLAYING);
+
+    // Update debug panel
+    function updateDebugPanel() {
+      const cameraSystem = engine.getCameraSystem();
+      const debugInfo = cameraSystem.getDebugInfo();
+
+      document.getElementById('mode').textContent = debugInfo.mode;
+      document.getElementById('transitioning').textContent = debugInfo.isTransitioning ? 'YES' : 'NO';
+
+      const pos = debugInfo.position;
+      document.getElementById('position').textContent =
+        `X: ${pos.x.toFixed(2)}, Y: ${pos.y.toFixed(2)}, Z: ${pos.z.toFixed(2)}`;
+
+      const rot = debugInfo.rotation;
+      document.getElementById('rotation').textContent =
+        `X: ${rot.x.toFixed(2)}, Y: ${rot.y.toFixed(2)}, Z: ${rot.z.toFixed(2)}`;
+
+      const lookAt = debugInfo.smoothLookAt;
+      document.getElementById('lookat').textContent =
+        `X: ${lookAt.x.toFixed(2)}, Y: ${lookAt.y.toFixed(2)}, Z: ${lookAt.z.toFixed(2)}`;
+
+      const vehicle = engine.getVehicle();
+      if (vehicle) {
+        const transform = vehicle.getTransform();
+        const vpos = transform.position;
+        document.getElementById('vehicle-pos').textContent =
+          `X: ${vpos.x.toFixed(2)}, Y: ${vpos.y.toFixed(2)}, Z: ${vpos.z.toFixed(2)}`;
+
+        const telemetry = vehicle.getTelemetry();
+        document.getElementById('vehicle-speed').textContent =
+          `${telemetry.speedKmh.toFixed(1)} km/h (${telemetry.speed.toFixed(1)} m/s)`;
+      } else {
+        document.getElementById('vehicle-pos').textContent = 'Vehicle not loaded';
+        document.getElementById('vehicle-speed').textContent = '-';
+      }
+
+      requestAnimationFrame(updateDebugPanel);
+    }
+    updateDebugPanel();
+
+    // Camera mode switching
+    window.addEventListener('keydown', (e) => {
+      const cameraSystem = engine.getCameraSystem();
+
+      if (e.key === '1') {
+        console.log('Switching to FIRST_PERSON camera');
+        cameraSystem.setMode(CameraMode.FIRST_PERSON);
+      } else if (e.key === '2') {
+        console.log('Switching to CHASE_CAMERA camera');
+        cameraSystem.setMode(CameraMode.CHASE_CAMERA);
+      } else if (e.key === '3') {
+        console.log('Switching to REPLAY camera');
+        cameraSystem.setMode(CameraMode.REPLAY);
+      }
+    });
+
+    console.log('=== Camera Test Active ===');
+    console.log('Current mode:', engine.getCameraSystem().getDebugInfo().mode);
+    console.log('Press [1] for First Person, [2] for Chase, [3] for Replay');
+  </script>
+</body>
+</html>

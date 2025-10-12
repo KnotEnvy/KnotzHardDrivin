@@ -3,6 +3,9 @@ import { GameEngine, GameState } from './core/GameEngine';
 
 const engine = new GameEngine();
 
+// Expose engine on window for E2E testing
+(window as any).gameEngine = engine;
+
 // Start the game engine
 engine.start().then(() => {
   // Auto-start in PLAYING mode for Phase 2 testing

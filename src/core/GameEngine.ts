@@ -4,7 +4,10 @@ import { StateManager } from './StateManager';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 import { Vehicle } from '../entities/Vehicle';
 import { InputSystem } from '../systems/InputSystem';
+import { CameraSystem } from '../systems/CameraSystem';
 import { DEFAULT_VEHICLE_CONFIG } from '../config/PhysicsConfig';
+import { Track, TrackData } from '../entities/Track';
+import { WaypointSystem, WaypointData } from '../systems/WaypointSystem';
 import * as THREE from 'three';
 
 /**
@@ -33,6 +36,11 @@ export class GameEngine {
   // Phase 2: Vehicle and Input
   private vehicle?: Vehicle;
   private inputSystem?: InputSystem;
+  private cameraSystem: CameraSystem;
+
+  // Phase 3: Track and Waypoint System
+  private track: Track | null = null;
+  private waypointSystem: WaypointSystem | null = null;
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
@@ -58,6 +66,7 @@ export class GameEngine {
     this.physicsWorld = new PhysicsWorld();
     this.stateManager = new StateManager();
     this.performanceMonitor = new PerformanceMonitor();
+    this.cameraSystem = new CameraSystem(this.sceneManager.camera);
 
     // Handle window resize
     window.addEventListener('resize', this.handleResize);
@@ -155,16 +164,48 @@ export class GameEngine {
           const input = this.inputSystem.getInput();
 
           // Handle reset
-          if (input.reset && this.vehicle) {
-            this.vehicle.reset(
-              new THREE.Vector3(0, 2, 0),
-              new THREE.Quaternion()
-            );
+          if (input.reset && this.vehicle && this.track) {
+            const spawnPoint = this.track.getSpawnPoint();
+            this.vehicle.reset(spawnPoint.position, spawnPoint.rotation);
+            if (this.waypointSystem) {
+              this.waypointSystem.reset();
+            }
+            console.log('Vehicle reset to spawn point');
           }
 
           // Handle pause
           if (input.pause) {
             this.setState(GameState.PAUSED);
+          }
+        }
+
+        // Update waypoint system
+        if (this.waypointSystem && this.vehicle) {
+          const transform = this.vehicle.getTransform();
+          const vehiclePos = transform.position;
+          const vehicleForward = transform.forward;
+          const waypointResult = this.waypointSystem.update(vehiclePos, vehicleForward);
+
+          // Log waypoint events
+          if (waypointResult.waypointPassed) {
+            console.log(`Waypoint ${waypointResult.waypointId} passed`);
+            if (waypointResult.timeBonus) {
+              console.log(`Time bonus: +${waypointResult.timeBonus}s`);
+            }
+          }
+
+          if (waypointResult.lapCompleted) {
+            console.log(`Lap ${waypointResult.currentLap} completed! Progress: ${(this.waypointSystem.getProgress() * 100).toFixed(1)}%`);
+          }
+
+          if (waypointResult.raceFinished) {
+            console.log('Race finished! All laps completed!');
+            // TODO: Transition to RESULTS state (Phase 7)
+          }
+
+          if (waypointResult.wrongWay) {
+            console.log('WRONG WAY! Turn around!');
+            // TODO: Show wrong-way indicator UI (Phase 7)
           }
         }
         break;
@@ -195,6 +236,16 @@ export class GameEngine {
    * Renders the current frame.
    */
   private render(): void {
+    // Update camera to follow vehicle (if available)
+    if (this.vehicle && this.state === GameState.PLAYING) {
+      const transform = this.vehicle.getTransform();
+      this.cameraSystem.update(0.016, {
+        position: transform.position,
+        quaternion: transform.rotation, // FIX: VehicleTransform has 'rotation', not 'quaternion'
+        velocity: transform.linearVelocity,
+      });
+    }
+
     this.sceneManager.render();
   }
 
@@ -247,22 +298,10 @@ export class GameEngine {
         // Start race timer, enable input
         this.accumulator = 0; // Reset accumulator
 
-        // Create vehicle
-        this.vehicle = new Vehicle(
-          this.physicsWorld.world,
-          DEFAULT_VEHICLE_CONFIG
-        );
-        // Initialize vehicle at spawn position (async but completes quickly)
-        this.vehicle.init(
-          new THREE.Vector3(0, 2, 0),  // 2m above ground
-          new THREE.Quaternion(),       // No rotation
-          this.sceneManager.scene       // Pass scene for visual meshes
-        );
-
-        // Create input system
-        this.inputSystem = new InputSystem();
-
-        console.log('Vehicle and InputSystem initialized');
+        // Initialize track and vehicle asynchronously
+        this.initializeRace().catch(error => {
+          console.error('Failed to initialize race:', error);
+        });
         break;
       case GameState.PAUSED:
         // Show pause menu
@@ -301,6 +340,15 @@ export class GameEngine {
           this.inputSystem.dispose();
           this.inputSystem = undefined;
         }
+        // Clean up track and waypoint system
+        if (this.track) {
+          this.track.dispose();
+          this.track = null;
+        }
+        if (this.waypointSystem) {
+          this.waypointSystem = null;
+        }
+        console.log('Race cleanup complete');
         break;
       case GameState.PAUSED:
         // Hide pause menu
@@ -399,6 +447,143 @@ export class GameEngine {
   }
 
   /**
+   * Gets the track instance (Phase 3).
+   */
+  getTrack(): Track | null {
+    return this.track;
+  }
+
+  /**
+   * Gets the waypoint system instance (Phase 3).
+   */
+  getWaypointSystem(): WaypointSystem | null {
+    return this.waypointSystem;
+  }
+
+  /**
+   * Gets the camera system instance.
+   */
+  getCameraSystem(): CameraSystem {
+    return this.cameraSystem;
+  }
+
+  /**
+   * Loads track data from JSON file and converts waypoint format.
+   * @param path - Path to track JSON file
+   * @returns Promise resolving to TrackData
+   */
+  private async loadTrackData(path: string): Promise<TrackData> {
+    try {
+      // Add cache-busting timestamp for development
+      const cacheBustedPath = `${path}?t=${Date.now()}`;
+      const response = await fetch(cacheBustedPath);
+      if (!response.ok) {
+        throw new Error(`Failed to load track: ${path} - ${response.statusText}`);
+      }
+
+      const data: TrackData = await response.json();
+
+      // Validate required fields
+      if (!data.name || !data.sections || !data.waypoints || !data.spawnPoint) {
+        throw new Error('Invalid track data: missing required fields');
+      }
+
+      console.log(`Track data loaded: ${data.name} (${data.sections.length} sections, ${data.waypoints.length} waypoints)`);
+      return data;
+    } catch (error) {
+      console.error(`Error loading track data from ${path}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Converts track waypoint data to WaypointSystem format.
+   * @param trackData - Track data with waypoints as arrays
+   * @returns Array of WaypointData with THREE.Vector3 objects
+   */
+  private convertWaypoints(trackData: TrackData): WaypointData[] {
+    return trackData.waypoints.map(wp => ({
+      id: wp.id,
+      position: new THREE.Vector3(wp.position[0], wp.position[1], wp.position[2]),
+      direction: new THREE.Vector3(wp.direction[0], wp.direction[1], wp.direction[2]),
+      triggerRadius: wp.triggerRadius,
+      isCheckpoint: wp.isCheckpoint,
+      timeBonus: wp.timeBonus,
+    }));
+  }
+
+  /**
+   * Initializes race by loading track, creating vehicle at spawn point, and setting up waypoint system.
+   * Called when entering PLAYING state.
+   */
+  private async initializeRace(): Promise<void> {
+    try {
+      console.log('Initializing race...');
+
+      // Load track data (with leading slash for Vite public folder)
+      const trackData = await this.loadTrackData('/assets/tracks/track01.json');
+
+      // FIX: Check if state changed during async operation to prevent race condition
+      if (this.state !== GameState.PLAYING) {
+        console.log('Race initialization cancelled - state changed during track loading');
+        return;
+      }
+
+      // Create track with visual mesh and physics collider
+      this.track = new Track(trackData, this.physicsWorld, this.sceneManager.scene);
+
+      // Get spawn point from track
+      const spawnPoint = this.track.getSpawnPoint();
+
+      // Create vehicle at spawn position
+      this.vehicle = new Vehicle(
+        this.physicsWorld.world,
+        DEFAULT_VEHICLE_CONFIG
+      );
+
+      await this.vehicle.init(
+        spawnPoint.position,
+        spawnPoint.rotation,
+        this.sceneManager.scene
+      );
+
+      // FIX: Check state again after second async operation
+      if (this.state !== GameState.PLAYING) {
+        console.log('Race initialization cancelled - state changed during vehicle initialization');
+        // Clean up partially initialized resources
+        if (this.vehicle) {
+          this.vehicle.dispose();
+          this.vehicle = undefined;
+        }
+        if (this.track) {
+          this.track.dispose();
+          this.track = null;
+        }
+        return;
+      }
+
+      // Create input system
+      this.inputSystem = new InputSystem();
+
+      // Convert waypoints and create waypoint system
+      const waypoints = this.convertWaypoints(trackData);
+      this.waypointSystem = new WaypointSystem(waypoints);
+      this.waypointSystem.setMaxLaps(2); // Default: 2 laps
+
+      console.log('✅ Race initialized successfully!');
+      console.log(`✅ Vehicle spawned at: (${spawnPoint.position.x.toFixed(2)}, ${spawnPoint.position.y.toFixed(2)}, ${spawnPoint.position.z.toFixed(2)})`);
+      console.log(`✅ Track: ${trackData.name}, Waypoints: ${waypoints.length}, Max Laps: ${this.waypointSystem.getMaxLaps()}`);
+      console.log(`✅ Track mesh has ${this.track.getMesh().geometry.attributes.position.count} vertices`);
+      console.log('🎮 Game is ready to play!');
+    } catch (error) {
+      console.error('❌ CRITICAL ERROR: Failed to initialize race:', error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+      // Don't rethrow - let the game continue with test scene
+      alert(`Failed to load track: ${error instanceof Error ? error.message : String(error)}\n\nCheck console for details.`);
+    }
+  }
+
+  /**
    * Stops the game loop and cleans up resources.
    */
   stop(): void {
@@ -412,6 +597,15 @@ export class GameEngine {
     }
     if (this.inputSystem) {
       this.inputSystem.dispose();
+    }
+
+    // Cleanup Phase 3 systems
+    if (this.track) {
+      this.track.dispose();
+      this.track = null;
+    }
+    if (this.waypointSystem) {
+      this.waypointSystem = null;
     }
   }
 }

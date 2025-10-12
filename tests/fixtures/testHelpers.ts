@@ -198,6 +198,20 @@ export function createMockPhysicsWorld(raycastResults: Array<any | null> = []) {
 }
 
 /**
+ * Creates a mock Three.js Scene for testing
+ * @returns Mock scene object
+ */
+export function createMockScene() {
+  return {
+    add: vi.fn(),
+    remove: vi.fn(),
+    children: [],
+    traverse: vi.fn(),
+    getObjectByName: vi.fn(),
+  };
+}
+
+/**
  * Simulates multiple physics steps for a vehicle
  * @param vehicle - Vehicle instance
  * @param input - Input to apply
@@ -368,3 +382,456 @@ export function isValidQuaternion(quaternion: THREE.Quaternion): boolean {
  * Import vi from vitest for mocking
  */
 import { vi } from 'vitest';
+
+// ============================================================================
+// PHASE 3: TRACK SYSTEM TEST HELPERS
+// ============================================================================
+
+/**
+ * Creates a mock Track instance for testing
+ * @param trackData - Optional track configuration
+ * @returns Mock track object with essential methods
+ */
+export function createMockTrack(trackData?: any) {
+  const data = trackData || {
+    name: 'Test Track',
+    width: 10,
+    sections: [],
+    waypoints: [],
+  };
+
+  return {
+    data,
+    mesh: null as any,
+    collider: null as any,
+    spline: null as any,
+
+    generateSpline: vi.fn((sections: any[]) => {
+      // Mock spline generation
+      const points = [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, 100),
+      ];
+      return (global as any).MockCatmullRomCurve3
+        ? new (global as any).MockCatmullRomCurve3(points, true)
+        : { points, getPoints: () => points };
+    }),
+
+    generateMesh: vi.fn((width: number) => {
+      // Mock mesh generation
+      return {
+        geometry: new (global as any).MockBufferGeometry(),
+        material: {},
+        position: new THREE.Vector3(),
+        rotation: new THREE.Euler(),
+      };
+    }),
+
+    generateCollider: vi.fn((world: any) => {
+      // Mock collider generation
+      return {
+        handle: Math.random(),
+        friction: 1.0,
+        setFriction: vi.fn(),
+      };
+    }),
+
+    getBounds: vi.fn(() => ({
+      min: new THREE.Vector3(-50, 0, -50),
+      max: new THREE.Vector3(50, 10, 200),
+    })),
+
+    getLength: vi.fn(() => 500),
+
+    dispose: vi.fn(),
+  };
+}
+
+/**
+ * Creates a mock Waypoint instance for testing
+ * @param waypointData - Waypoint configuration
+ * @returns Mock waypoint object
+ */
+export function createMockWaypoint(waypointData?: any) {
+  const data = waypointData || {
+    id: 0,
+    position: new THREE.Vector3(0, 0, 0),
+    direction: new THREE.Vector3(0, 0, 1),
+    triggerRadius: 5,
+    isCheckpoint: false,
+  };
+
+  return {
+    id: data.id,
+    position: data.position,
+    direction: data.direction,
+    triggerRadius: data.triggerRadius,
+    isCheckpoint: data.isCheckpoint,
+    timeBonus: data.timeBonus,
+
+    isTriggered: vi.fn((vehiclePosition: THREE.Vector3) => {
+      const distance = vehiclePosition.distanceTo(data.position);
+      return distance < data.triggerRadius;
+    }),
+
+    getDistanceFrom: vi.fn((position: THREE.Vector3) => {
+      return position.distanceTo(data.position);
+    }),
+  };
+}
+
+/**
+ * Creates a mock Obstacle instance for testing
+ * @param obstacleData - Obstacle configuration
+ * @returns Mock obstacle object
+ */
+export function createMockObstacle(obstacleData?: any) {
+  const data = obstacleData || {
+    type: 'cone',
+    position: new THREE.Vector3(0, 0, 0),
+    rotation: new THREE.Quaternion(),
+    scale: new THREE.Vector3(1, 1, 1),
+  };
+
+  return {
+    type: data.type,
+    mesh: {
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+    },
+    collider: {
+      handle: Math.random(),
+      friction: 0.5,
+    },
+
+    dispose: vi.fn(),
+  };
+}
+
+/**
+ * Validates spline generation correctness
+ * @param spline - Spline to validate
+ * @param expectedPointCount - Expected number of control points
+ * @returns True if spline is valid
+ */
+export function validateTrackSpline(spline: any, expectedPointCount?: number): boolean {
+  if (!spline) return false;
+  if (!spline.points || !Array.isArray(spline.points)) return false;
+  if (spline.points.length < 2) return false;
+
+  if (expectedPointCount !== undefined) {
+    if (spline.points.length !== expectedPointCount) return false;
+  }
+
+  // Check all points are valid Vector3
+  for (const point of spline.points) {
+    if (!isFiniteVector3(point)) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validates collision mesh integrity
+ * @param geometry - BufferGeometry to validate
+ * @returns True if collision mesh is valid
+ */
+export function validateCollisionMesh(geometry: any): boolean {
+  if (!geometry) return false;
+
+  // Check for position attribute
+  const positionAttr = geometry.attributes?.get('position') || geometry.getAttribute?.('position');
+  if (!positionAttr) return false;
+  if (!positionAttr.array || positionAttr.array.length === 0) return false;
+
+  // Check for index
+  if (!geometry.index) return false;
+  if (!geometry.index.array || geometry.index.array.length === 0) return false;
+
+  // Check triangles are valid (indices in range)
+  const vertexCount = positionAttr.array.length / 3;
+  const indices = geometry.index.array;
+
+  for (let i = 0; i < indices.length; i++) {
+    if (indices[i] < 0 || indices[i] >= vertexCount) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Simulates vehicle passing through a waypoint
+ * @param waypointSystem - WaypointSystem instance
+ * @param vehiclePosition - Vehicle position
+ * @returns Waypoint result object
+ */
+export function simulateWaypointPass(waypointSystem: any, vehiclePosition: THREE.Vector3): any {
+  return waypointSystem.update(vehiclePosition);
+}
+
+/**
+ * Generates a sequence of positions along a straight path
+ * @param start - Start position
+ * @param end - End position
+ * @param steps - Number of steps
+ * @returns Array of Vector3 positions
+ */
+export function generatePathPositions(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  steps: number
+): THREE.Vector3[] {
+  const positions: THREE.Vector3[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const position = new THREE.Vector3().lerpVectors(start, end, t);
+    positions.push(position);
+  }
+
+  return positions;
+}
+
+/**
+ * Simulates vehicle driving along a path
+ * @param vehicle - Vehicle instance
+ * @param path - Array of positions
+ * @param waypointSystem - Optional waypoint system to test
+ * @returns Array of waypoint results
+ */
+export function simulateDrivingPath(
+  vehicle: any,
+  path: THREE.Vector3[],
+  waypointSystem?: any
+): any[] {
+  const results: any[] = [];
+
+  for (const position of path) {
+    // Update vehicle position
+    if (vehicle.setPosition) {
+      vehicle.setPosition(position);
+    }
+
+    // Check waypoints if system provided
+    if (waypointSystem) {
+      const result = waypointSystem.update(position);
+      if (result) {
+        results.push(result);
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Validates track bounds calculation
+ * @param bounds - Bounds object with min/max
+ * @param trackSections - Track sections array
+ * @returns True if bounds seem reasonable
+ */
+export function validateTrackBounds(bounds: any, trackSections: any[]): boolean {
+  if (!bounds || !bounds.min || !bounds.max) return false;
+
+  // Min should be less than max in all dimensions
+  if (bounds.min.x >= bounds.max.x) return false;
+  if (bounds.min.y >= bounds.max.y) return false;
+  if (bounds.min.z >= bounds.max.z) return false;
+
+  // Bounds should be finite
+  if (!isFiniteVector3(bounds.min) || !isFiniteVector3(bounds.max)) return false;
+
+  return true;
+}
+
+/**
+ * Calculates expected track mesh vertex count
+ * @param splinePoints - Number of spline points
+ * @param trackWidth - Track width
+ * @returns Expected vertex count
+ */
+export function calculateExpectedVertexCount(splinePoints: number, trackWidth: number): number {
+  // Each spline point generates 2 vertices (left and right edge)
+  return splinePoints * 2;
+}
+
+/**
+ * Calculates expected track mesh triangle count
+ * @param splinePoints - Number of spline points
+ * @returns Expected triangle count
+ */
+export function calculateExpectedTriangleCount(splinePoints: number): number {
+  // Each segment between points generates 2 triangles (quad)
+  return (splinePoints - 1) * 2;
+}
+
+/**
+ * Tests waypoint sequence progression
+ * @param waypoints - Array of waypoint data
+ * @param vehiclePath - Array of vehicle positions
+ * @returns Array of triggered waypoint IDs in order
+ */
+export function testWaypointProgression(
+  waypoints: any[],
+  vehiclePath: THREE.Vector3[]
+): number[] {
+  const triggeredWaypoints: number[] = [];
+
+  for (const position of vehiclePath) {
+    for (const waypoint of waypoints) {
+      const distance = position.distanceTo(waypoint.position);
+      if (distance < waypoint.triggerRadius && !triggeredWaypoints.includes(waypoint.id)) {
+        triggeredWaypoints.push(waypoint.id);
+      }
+    }
+  }
+
+  return triggeredWaypoints;
+}
+
+/**
+ * Validates minimap rendering setup
+ * @param minimap - Minimap object
+ * @returns True if minimap is properly configured
+ */
+export function validateMinimapSetup(minimap: any): boolean {
+  if (!minimap) return false;
+
+  // Check for camera
+  if (!minimap.camera) return false;
+
+  // Check for render target or texture
+  if (!minimap.texture && !minimap.renderTarget) return false;
+
+  // Check for size
+  if (!minimap.size || minimap.size <= 0) return false;
+
+  return true;
+}
+
+/**
+ * Simulates collision between vehicle and obstacle
+ * @param vehicle - Vehicle instance
+ * @param obstacle - Obstacle instance
+ * @returns Collision result object
+ */
+export function simulateObstacleCollision(vehicle: any, obstacle: any): any {
+  const vehiclePos = vehicle.getPosition ? vehicle.getPosition() : new THREE.Vector3();
+  const obstaclePos = obstacle.mesh?.position || new THREE.Vector3();
+
+  const distance = vehiclePos.distanceTo(obstaclePos);
+  const collisionRadius = 2; // Approximate collision radius
+
+  if (distance < collisionRadius) {
+    return {
+      collided: true,
+      distance,
+      position: obstaclePos,
+      obstacle,
+    };
+  }
+
+  return {
+    collided: false,
+    distance,
+  };
+}
+
+/**
+ * Generates test surface type data
+ * @param surfaceType - Type of surface (tarmac, dirt, grass, ice)
+ * @returns Surface configuration object
+ */
+export function generateSurfaceTypeData(surfaceType: string): any {
+  const surfaceConfigs = {
+    tarmac: { friction: 1.0, restitution: 0.1, color: 0x333333 },
+    dirt: { friction: 0.6, restitution: 0.2, color: 0x8b7355 },
+    grass: { friction: 0.4, restitution: 0.15, color: 0x228b22 },
+    ice: { friction: 0.2, restitution: 0.05, color: 0xccffff },
+  };
+
+  return surfaceConfigs[surfaceType as keyof typeof surfaceConfigs] || surfaceConfigs.tarmac;
+}
+
+/**
+ * Validates track section data
+ * @param section - Track section to validate
+ * @returns True if section is valid
+ */
+export function validateTrackSection(section: any): boolean {
+  if (!section || !section.type) return false;
+
+  const validTypes = ['straight', 'curve', 'ramp', 'loop', 'bank'];
+  if (!validTypes.includes(section.type)) return false;
+
+  // Type-specific validation
+  switch (section.type) {
+    case 'straight':
+    case 'ramp':
+      return typeof section.length === 'number' && section.length > 0;
+
+    case 'curve':
+    case 'bank':
+      return (
+        typeof section.radius === 'number' &&
+        section.radius > 0 &&
+        typeof section.angle === 'number' &&
+        section.angle > 0
+      );
+
+    case 'loop':
+      return typeof section.radius === 'number' && section.radius > 0;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Measures track generation performance
+ * @param trackGenerator - Function that generates a track
+ * @param iterations - Number of iterations to average
+ * @returns Average generation time in milliseconds
+ */
+export function benchmarkTrackGeneration(
+  trackGenerator: () => any,
+  iterations: number = 10
+): number {
+  return benchmarkFunction(trackGenerator, iterations);
+}
+
+/**
+ * Creates a mock minimap for testing
+ * @param size - Minimap size in pixels
+ * @returns Mock minimap object
+ */
+export function createMockMinimap(size: number = 512) {
+  return {
+    size,
+    camera: new (global as any).MockOrthographicCamera(-100, 100, 100, -100, 0, 100),
+    renderTarget: new (global as any).MockWebGLRenderTarget(size, size),
+    texture: null as any,
+
+    generate: vi.fn((track: any) => {
+      // Mock minimap generation
+      return {
+        width: size,
+        height: size,
+      };
+    }),
+
+    drawPlayerMarker: vi.fn((position: THREE.Vector3, rotation: number) => {
+      // Mock player marker drawing
+    }),
+
+    worldToScreen: vi.fn((worldPos: THREE.Vector3) => {
+      return new THREE.Vector2(
+        (worldPos.x + 100) / 200 * size,
+        (worldPos.z + 100) / 200 * size
+      );
+    }),
+
+    dispose: vi.fn(),
+  };
+}

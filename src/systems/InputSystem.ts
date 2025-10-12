@@ -332,22 +332,22 @@ export class InputSystem {
     const mapping = this.config.gamepadMapping;
 
     // Throttle (right trigger - can be button or axis)
-    // Most modern controllers use axes[3] for right trigger (0 to 1 range, but sometimes -1 to 1)
+    // Modern controllers use axes[3] for right trigger (Gamepad API spec: 0 to 1 range)
     if (gamepad.axes.length > 3) {
-      // Axis input (normalize from potentially -1..1 to 0..1)
-      this.rawThrottle = Math.max(0, (gamepad.axes[3] + 1) / 2);
+      // Axis input (already 0-1 range per spec, but clamp to be safe)
+      this.rawThrottle = Math.max(0, Math.min(1, gamepad.axes[3]));
     } else if (gamepad.buttons[mapping.throttle]) {
-      // Button input
+      // Button input (fallback for older controllers)
       this.rawThrottle = gamepad.buttons[mapping.throttle].value;
     }
 
     // Brake (left trigger - can be button or axis)
-    // Most modern controllers use axes[2] for left trigger
+    // Modern controllers use axes[2] for left trigger (Gamepad API spec: 0 to 1 range)
     if (gamepad.axes.length > 2) {
-      // Axis input (normalize from potentially -1..1 to 0..1)
-      this.rawBrake = Math.max(0, (gamepad.axes[2] + 1) / 2);
+      // Axis input (already 0-1 range per spec, but clamp to be safe)
+      this.rawBrake = Math.max(0, Math.min(1, gamepad.axes[2]));
     } else if (gamepad.buttons[mapping.brake]) {
-      // Button input
+      // Button input (fallback for older controllers)
       this.rawBrake = gamepad.buttons[mapping.brake].value;
     }
 
@@ -438,11 +438,11 @@ export class InputSystem {
 
   /**
    * Get current input state
-   * Returns a reference to avoid allocations - DO NOT MODIFY the returned object
-   * @returns Current vehicle input state
+   * Returns a copy to prevent external mutation
+   * @returns Current vehicle input state (copy)
    */
   getInput(): VehicleInput {
-    return this.currentInput;
+    return { ...this.currentInput };
   }
 
   /**

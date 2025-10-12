@@ -1,0 +1,47 @@
+{
+  "name": "Hard Drivin' Classic",
+  "width": 10,
+  "sections": [
+    {
+      "type": "straight",
+      "length": 100
+    },
+    {
+      "type": "curve",
+      "radius": 50,
+      "angle": 90
+    },
+    {
+      "type": "straight",
+      "length": 50
+    }
+  ],
+  "waypoints": [
+    {
+      "id": 0,
+      "position": [0, 0, 0],
+      "direction": [0, 0, 1],
+      "triggerRadius": 10,
+      "isCheckpoint": false
+    },
+    {
+      "id": 1,
+      "position": [0, 0, 100],
+      "direction": [0, 0, 1],
+      "triggerRadius": 10,
+      "isCheckpoint": true,
+      "timeBonus": 30
+    },
+    {
+      "id": 2,
+      "position": [50, 0, 150],
+      "direction": [1, 0, 0],
+      "triggerRadius": 10,
+      "isCheckpoint": false
+    }
+  ],
+  "spawnPoint": {
+    "position": [0, 2, 5],
+    "rotation": [0, 0, 0, 1]
+  }
+}

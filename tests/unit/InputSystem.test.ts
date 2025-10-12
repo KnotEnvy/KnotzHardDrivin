@@ -606,12 +606,14 @@ describe('InputSystem', () => {
       expect(inputSystem.getActiveDevice()).toBe(InputDevice.KEYBOARD);
     });
 
-    it('should return input reference (not copy)', () => {
+    it('should return input copy (not reference)', () => {
       const input1 = inputSystem.getInput();
       const input2 = inputSystem.getInput();
 
-      // Same reference (for performance)
-      expect(input1).toBe(input2);
+      // Different references (for safety - prevents external mutation)
+      expect(input1).not.toBe(input2);
+      // But same values
+      expect(input1).toEqual(input2);
     });
   });
 

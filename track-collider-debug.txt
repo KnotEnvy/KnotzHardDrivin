@@ -1,0 +1,92 @@
+
+Running 1 test using 1 worker
+
+
+=== TRACK COLLIDER DEBUG ===
+{
+  "rigidBodies": [
+    {
+      "index": 0,
+      "translation": {
+        "x": "-0.00",
+        "y": "1.00",
+        "z": "-0.00"
+      },
+      "isFixed": false,
+      "isDynamic": true,
+      "numColliders": 1
+    },
+    {
+      "index": 1,
+      "translation": {
+        "x": "-0.00",
+        "y": "1.00",
+        "z": "-0.00"
+      },
+      "isFixed": false,
+      "isDynamic": true,
+      "numColliders": 1
+    },
+    {
+      "index": 2,
+      "translation": {
+        "x": "-0.00",
+        "y": "1.00",
+        "z": "-0.00"
+      },
+      "isFixed": false,
+      "isDynamic": true,
+      "numColliders": 1
+    }
+  ],
+  "colliders": [
+    {
+      "index": 0,
+      "shapeType": "unknown",
+      "isSensor": false,
+      "friction": 0.5,
+      "restitution": 0,
+      "parentHandle": null
+    },
+    {
+      "index": 1,
+      "shapeType": "unknown",
+      "isSensor": false,
+      "friction": 0.5,
+      "restitution": 0,
+      "parentHandle": null
+    },
+    {
+      "index": 2,
+      "shapeType": "unknown",
+      "isSensor": false,
+      "friction": 0.5,
+      "restitution": 0,
+      "parentHandle": null
+    }
+  ],
+  "raycastFromAbove": {
+    "hitAll": {
+      "toi": "8.00",
+      "colliderHandle": 0
+    },
+    "hitExcludingVehicle": {
+      "toi": "8.00",
+      "colliderHandle": 0
+    }
+  },
+  "trackColliderHandle": 5e-324,
+  "vehicleColliderHandle": 1e-323
+}
+
+=== ANALYSIS ===
+Total rigid bodies: 3
+Total colliders: 3
+
+✓ Raycast from above HIT something at distance 8.00m
+  Collider handle: 0
+✓ Raycast excluding vehicle HIT at 8.00m
+  This should be the track collider!
+  ✓  1 tests\e2e\track-collider-debug.spec.ts:3:5 › Debug track collider properties (6.0s)
+
+  1 passed (13.4s)
