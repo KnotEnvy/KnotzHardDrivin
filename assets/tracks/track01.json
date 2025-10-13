@@ -1,42 +1,84 @@
 {
-  "name": "Hard Drivin' Classic",
+  "name": "Thunder Speedway Oval",
   "width": 10,
   "sections": [
     {
       "type": "straight",
-      "length": 100
+      "length": 120
     },
     {
-      "type": "curve",
+      "type": "bank",
       "radius": 50,
-      "angle": 90
+      "angle": 90,
+      "banking": 15
     },
     {
       "type": "straight",
-      "length": 50
+      "length": 120
+    },
+    {
+      "type": "bank",
+      "radius": 50,
+      "angle": 90,
+      "banking": 15
     }
   ],
   "waypoints": [
     {
       "id": 0,
-      "position": [0, 0, 0],
+      "position": [0, 0, 10],
       "direction": [0, 0, 1],
-      "triggerRadius": 10,
-      "isCheckpoint": false
-    },
-    {
-      "id": 1,
-      "position": [0, 0, 100],
-      "direction": [0, 0, 1],
-      "triggerRadius": 10,
+      "triggerRadius": 12,
       "isCheckpoint": true,
       "timeBonus": 30
     },
     {
+      "id": 1,
+      "position": [0, 0, 120],
+      "direction": [0, 0, 1],
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
       "id": 2,
-      "position": [50, 0, 150],
+      "position": [50, 0, 170],
       "direction": [1, 0, 0],
-      "triggerRadius": 10,
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
+      "id": 3,
+      "position": [100, 0, 170],
+      "direction": [1, 0, 0],
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
+      "id": 4,
+      "position": [150, 0, 120],
+      "direction": [0, 0, -1],
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
+      "id": 5,
+      "position": [150, 0, 10],
+      "direction": [0, 0, -1],
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
+      "id": 6,
+      "position": [100, 0, 40],
+      "direction": [-1, 0, 0],
+      "triggerRadius": 12,
+      "isCheckpoint": false
+    },
+    {
+      "id": 7,
+      "position": [50, 0, 40],
+      "direction": [-1, 0, 0],
+      "triggerRadius": 12,
       "isCheckpoint": false
     }
   ],

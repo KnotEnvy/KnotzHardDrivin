@@ -1,0 +1,196 @@
+{
+  "name": "Alpine Figure-8 Circuit",
+  "width": 12,
+  "sections": [
+    {
+      "type": "straight",
+      "length": 80
+    },
+    {
+      "type": "curve",
+      "radius": 40,
+      "angle": 45
+    },
+    {
+      "type": "ramp",
+      "length": 60,
+      "height": 15
+    },
+    {
+      "type": "bank",
+      "radius": 35,
+      "angle": 90,
+      "banking": 20
+    },
+    {
+      "type": "straight",
+      "length": 50
+    },
+    {
+      "type": "curve",
+      "radius": 30,
+      "angle": -135
+    },
+    {
+      "type": "straight",
+      "length": 40
+    },
+    {
+      "type": "ramp",
+      "length": 50,
+      "height": -12
+    },
+    {
+      "type": "curve",
+      "radius": 45,
+      "angle": -90
+    },
+    {
+      "type": "straight",
+      "length": 60
+    },
+    {
+      "type": "bank",
+      "radius": 38,
+      "angle": 135,
+      "banking": 18
+    },
+    {
+      "type": "straight",
+      "length": 45
+    },
+    {
+      "type": "curve",
+      "radius": 32,
+      "angle": -90
+    },
+    {
+      "type": "straight",
+      "length": 55
+    },
+    {
+      "type": "curve",
+      "radius": 35,
+      "angle": 45
+    }
+  ],
+  "waypoints": [
+    {
+      "id": 0,
+      "position": [0, 0, 10],
+      "direction": [0, 0, 1],
+      "triggerRadius": 14,
+      "isCheckpoint": true,
+      "timeBonus": 35
+    },
+    {
+      "id": 1,
+      "position": [0, 0, 80],
+      "direction": [0, 0, 1],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 2,
+      "position": [30, 0, 110],
+      "direction": [1, 0, 0.5],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 3,
+      "position": [50, 10, 140],
+      "direction": [0.7, 0.3, 0.7],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 4,
+      "position": [85, 15, 165],
+      "direction": [1, 0, 0],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 5,
+      "position": [120, 15, 140],
+      "direction": [0, 0, -1],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 6,
+      "position": [120, 15, 90],
+      "direction": [0, 0, -1],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 7,
+      "position": [85, 15, 55],
+      "direction": [-1, 0, -0.7],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 8,
+      "position": [60, 5, 30],
+      "direction": [-0.7, -0.2, -0.7],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 9,
+      "position": [30, 3, 10],
+      "direction": [-1, 0, 0],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 10,
+      "position": [-5, 3, 30],
+      "direction": [-0.7, 0, 1],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 11,
+      "position": [-25, 3, 65],
+      "direction": [0, 0, 1],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 12,
+      "position": [-5, 3, 95],
+      "direction": [1, 0, 0.5],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 13,
+      "position": [15, 2, 120],
+      "direction": [0.7, 0, 0.7],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 14,
+      "position": [35, 1, 140],
+      "direction": [1, 0, 0.5],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    },
+    {
+      "id": 15,
+      "position": [25, 0.5, 30],
+      "direction": [0.5, 0, -0.7],
+      "triggerRadius": 14,
+      "isCheckpoint": false
+    }
+  ],
+  "spawnPoint": {
+    "position": [0, 2, 5],
+    "rotation": [0, 0, 0, 1]
+  }
+}
