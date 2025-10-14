@@ -14,7 +14,8 @@
       "Bash(timeout 5 npm run dev)",
       "Bash(tee:*)",
       "Bash(npx playwright test:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []

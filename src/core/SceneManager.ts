@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EnvironmentSystem, ENVIRONMENT_QUALITY_PRESETS, EnvironmentQualitySettings } from '../systems/EnvironmentSystem';
 
 /**
  * SceneManager - Core Three.js scene setup and rendering
@@ -9,7 +10,7 @@ import * as THREE from 'three';
  * - Manage scene graph and rendering pipeline
  * - Configure shadow mapping, color space, and tone mapping
  * - Handle window resize events
- * - Provide skybox setup (placeholder for now)
+ * - Manage environment system (ground, sky, clouds, scenery)
  *
  * Performance considerations:
  * - Shadow map size configurable via quality settings
@@ -27,6 +28,10 @@ export class SceneManager {
   private hemisphereLight!: THREE.HemisphereLight;
   private ambientLight!: THREE.AmbientLight;
 
+  // Environment system
+  private environmentSystem!: EnvironmentSystem;
+  private environmentInitialized: boolean = false;
+
   // Test object for camera following
   public testCube!: THREE.Mesh;
 
@@ -36,10 +41,10 @@ export class SceneManager {
   constructor(canvas: HTMLCanvasElement, qualitySettings?: {
     shadowMapSize?: number;
     antialiasing?: boolean;
+    environmentQuality?: 'low' | 'medium' | 'high';
   }) {
     // Initialize scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xa0a0a0, 100, 500); // Distance fog
 
     // Initialize camera (will be managed by CameraSystem, but needs to exist)
     this.camera = new THREE.PerspectiveCamera(
@@ -60,8 +65,16 @@ export class SceneManager {
 
     this.setupRenderer(qualitySettings?.shadowMapSize ?? 2048);
     this.setupLighting();
-    this.setupSkybox();
     this.createTestScene();
+
+    // Initialize environment system asynchronously
+    const envQuality = qualitySettings?.environmentQuality ?? 'medium';
+    const envSettings = envQuality === 'low' ? ENVIRONMENT_QUALITY_PRESETS.LOW :
+                       envQuality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
+                       ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
+
+    this.environmentSystem = new EnvironmentSystem(this.scene, this.camera, envSettings);
+    this.initializeEnvironment();
 
     // Handle window resize - store bound reference for cleanup
     this.boundResizeHandler = this.onWindowResize.bind(this);
@@ -149,19 +162,18 @@ export class SceneManager {
   }
 
   /**
-   * Set up skybox (placeholder for now)
+   * Initialize environment system (ground, sky, clouds, scenery)
    *
-   * For MVP, we use a simple gradient background.
-   * Future enhancement: Load actual skybox textures (6-sided cube map)
-   *
-   * Performance: Negligible (~0.01ms)
+   * Called asynchronously during construction to avoid blocking renderer setup.
    */
-  private setupSkybox(): void {
-    // Placeholder: Use scene background color (sky blue)
-    this.scene.background = new THREE.Color(0x87ceeb);
-
-    // Alternative: Simple gradient using fog
-    // this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.002);
+  private async initializeEnvironment(): Promise<void> {
+    try {
+      await this.environmentSystem.init();
+      this.environmentInitialized = true;
+      console.log('✅ Scene environment ready');
+    } catch (error) {
+      console.error('❌ Failed to initialize environment:', error);
+    }
   }
 
   /**
@@ -256,6 +268,37 @@ export class SceneManager {
   }
 
   /**
+   * Update environment quality settings
+   * @param quality - 'low', 'medium', or 'high'
+   */
+  async setEnvironmentQuality(quality: 'low' | 'medium' | 'high'): Promise<void> {
+    const settings = quality === 'low' ? ENVIRONMENT_QUALITY_PRESETS.LOW :
+                    quality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
+                    ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
+
+    if (this.environmentInitialized) {
+      await this.environmentSystem.setQualitySettings(settings);
+    }
+  }
+
+  /**
+   * Get environment system instance
+   */
+  getEnvironmentSystem(): EnvironmentSystem {
+    return this.environmentSystem;
+  }
+
+  /**
+   * Update scene systems (called each frame)
+   * @param deltaTime - Time since last frame in seconds
+   */
+  update(deltaTime: number): void {
+    if (this.environmentInitialized) {
+      this.environmentSystem.update(deltaTime);
+    }
+  }
+
+  /**
    * Render the scene
    * Should be called once per frame from the game loop
    */
@@ -271,10 +314,16 @@ export class SceneManager {
    * - WebGL renderer context
    * - All Three.js geometries, materials, and textures
    * - Shadow maps
+   * - Environment system
    */
   dispose(): void {
     // Remove event listeners using the stored bound reference
     window.removeEventListener('resize', this.boundResizeHandler);
+
+    // Dispose of environment system
+    if (this.environmentInitialized) {
+      this.environmentSystem.dispose();
+    }
 
     // Dispose of renderer
     this.renderer.dispose();
