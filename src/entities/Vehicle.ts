@@ -1213,14 +1213,40 @@ export class Vehicle {
       return;
     }
 
-    // Create chassis mesh (box matching collider dimensions)
-    const chassisGeometry = new THREE.BoxGeometry(2.0, 1.0, 4.0);
-    const chassisMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2244aa, // Dark blue
-      metalness: 0.5,
-      roughness: 0.4,
+    // Create a group to hold all parts of the car body
+    this.chassisMesh = new THREE.Group();
+    this.chassisMesh.name = 'corvette-body';
+
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff0000, // Red
+      metalness: 0.8,
+      roughness: 0.2,
     });
-    this.chassisMesh = new THREE.Mesh(chassisGeometry, chassisMaterial);
+
+    // Main body
+    const mainBodyGeo = new THREE.BoxGeometry(2.0, 0.6, 4.5);
+    const mainBody = new THREE.Mesh(mainBodyGeo, bodyMaterial);
+    mainBody.position.y = 0.3;
+    this.chassisMesh.add(mainBody);
+
+    // Hood
+    const hoodGeo = new THREE.BoxGeometry(1.8, 0.4, 2.0);
+    const hood = new THREE.Mesh(hoodGeo, bodyMaterial);
+    hood.position.set(0, 0.5, 1.25);
+    this.chassisMesh.add(hood);
+
+    // Cabin
+    const cabinGeo = new THREE.BoxGeometry(1.6, 0.8, 1.5);
+    const cabin = new THREE.Mesh(cabinGeo, bodyMaterial);
+    cabin.position.set(0, 1.0, -0.5);
+    this.chassisMesh.add(cabin);
+
+    // Rear deck
+    const rearDeckGeo = new THREE.BoxGeometry(1.8, 0.3, 1.0);
+    const rearDeck = new THREE.Mesh(rearDeckGeo, bodyMaterial);
+    rearDeck.position.set(0, 0.45, -1.75);
+    this.chassisMesh.add(rearDeck);
+
     this.chassisMesh.castShadow = true;
     this.chassisMesh.receiveShadow = true;
     this.scene.add(this.chassisMesh);
