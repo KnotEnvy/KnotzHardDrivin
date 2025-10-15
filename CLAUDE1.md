@@ -23,7 +23,7 @@ This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade
 
 **Read These First**:
 1. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md` - Product Requirements (THE authoritative source)
-2. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md` - Phase-by-phase development plan
+2. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\{PHASE}\[Phase]_[#]_ROADMAP.md` - Phase-by-phase development plan for your phase
 3. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase3\PHASE_3_COMPLETION_REPORT.md` - What we just finished
 
 **Key Commands**:
@@ -160,8 +160,8 @@ All documentation lives in `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 
 **When to Read**: Before implementing ANY feature. This is the source of truth.
 
-#### `roadmap.md` - Development Roadmap
-**Path**: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md`
+#### `phase_#_roadmap.md` - Development Roadmaps
+**Path**: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\{Phase}\[phase]_#_roadmap.md`
 **Purpose**: Phase-by-phase development plan (14 weeks total)
 **What's Inside**:
 - Phase 0-8 task breakdowns
@@ -222,21 +222,6 @@ All documentation lives in `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 - Known issues and limitations
 - Phase 4 preparation checklist
 
-**When to Read**: To understand the track and waypoint systems you're building on.
-
-### Supporting Documents
-
-- `__DOCS__/phase1/PHASE_1A_COMPLETION.md` - Game engine details
-- `__DOCS__/phase1/PHASE_1B_COMPLETION_REPORT.md` - Camera system details
-- `__DOCS__/phase2/PHASE_2A_VEHICLE_PHYSICS_SUMMARY.md` - Vehicle physics details
-- `__DOCS__/phase2/PHASE_2B_INPUT_SYSTEM_SUMMARY.md` - Input system details
-- `__DOCS__/phase3/TRACK_INTEGRATION_COMPLETE.md` - Track integration guide
-- `__DOCS__/phase3/PHASE_3_PERFORMANCE_VALIDATION.md` - Performance metrics
-- `__DOCS__/phase3/PERFORMANCE_FIX_APPLIED.md` - WaypointSystem optimization
-- `.claude/commands/` - Custom slash commands (if configured)
-
----
-
 ## 4. Subagent System
 
 We use **specialized agents** for different aspects of development. Think of them as expert consultants you can call on.
@@ -290,7 +275,7 @@ File: src/entities/Vehicle.ts, line 245 (suspension force application)"
 ### Pro Tips
 
 1. **Be specific**: Mention file names, line numbers, requirements
-2. **Reference docs**: Point to PRD.md, roadmap.md, config files
+2. **Reference docs**: Point to PRD.md, phase by phase roadmap.md's, config files
 3. **Context matters**: Mention which phase you're in
 4. **Ask before major changes**: Consult @architect for structural decisions
 5. **Test early**: Use @test-engineer after each feature
@@ -370,20 +355,6 @@ D:\JavaScript Games\KnotzHardDrivin\
 │   ├── e2e/                     # Playwright E2E tests (Phase 8)
 │   └── setup.ts                 # Global test mocks ✅
 ├── __DOCS__/                    # All documentation
-│   ├── PRD.md                   # Product requirements ✅
-│   ├── roadmap.md               # Development roadmap ✅
-│   ├── subAgentsUserGuide.md   # Agent usage guide ✅
-│   ├── phase1/                  # Phase 1 completion docs ✅
-│   ├── phase2/                  # Phase 2 completion docs ✅
-│   │   ├── PHASE_2_COMPLETION_REPORT.md
-│   │   ├── PHASE_2A_VEHICLE_PHYSICS_SUMMARY.md
-│   │   ├── PHASE_2B_INPUT_SYSTEM_SUMMARY.md
-│   │   └── README.md
-│   └── phase3/                  # Phase 3 completion docs ✅
-│       ├── PHASE_3_COMPLETION_REPORT.md
-│       ├── TRACK_INTEGRATION_COMPLETE.md
-│       ├── PHASE_3_PERFORMANCE_VALIDATION.md
-│       └── PERFORMANCE_FIX_APPLIED.md
 ├── public/                      # Static assets
 ├── coverage/                    # Test coverage reports
 ├── dist/                        # Production build output
@@ -550,7 +521,7 @@ D:\JavaScript Games\KnotzHardDrivin\
 
 ### Starting a New Phase
 
-1. **Read the roadmap** for that phase (`__DOCS__/roadmap.md`)
+1. **Read the roadmap** for that phase (`__DOCS__/phase#/`)
 2. **Consult @architect** for design guidance
 3. **Review PRD.md** sections related to the phase
 4. **Set up testing infrastructure** (consult @test-engineer)
@@ -1132,7 +1103,6 @@ Tests:
 
 Documentation:
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md
-- D:\JavaScript Games\KnotzHardDrivin\__DOCS__\roadmap.md
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\subAgentsUserGuide.md
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase1\PHASE_1_COMPLETION_REPORT.md
 - D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md (Phase 2)
@@ -1146,7 +1116,7 @@ Documentation:
 You're joining a well-architected project with solid foundations. Phases 0, 1, 2, and 3 are complete with excellent test coverage, zero memory leaks, and great performance. The vehicle is fully functional and drives on a complete track system with waypoint tracking.
 
 **Keys to Success**:
-1. Read PRD.md and roadmap.md before implementing features
+1. Read PRD.md and phase roadmap.md's before implementing features
 2. Use specialized agents for their expertise
 3. Test early and often (>80% coverage)
 4. Profile performance regularly (<16.67ms frame time)
