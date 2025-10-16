@@ -573,6 +573,16 @@
 - **Audio Engineer**: Sound effects, music integration
 - **QA Lead**: Testing coordination, bug tracking
 
+### Important Game DOCS ###
+- **Phase Docs** __DOCS__\phase1\Phase_1_ROADMAP.md
+- **Phase Docs** __DOCS__\phase2\Phase_2_ROADMAP.md
+- **Phase Docs** __DOCS__\phase3\Phase_3_ROADMAP.md
+- **phase0** __DOCS__\Pregame_roadmap.md
+- **Game Authority** __DOCS__\PRD.md
+- **Phase completion** __DOCS__\phase1\PHASE_1B_COMPLETION_REPORT.md
+- **Phase completion** __DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md
+- **Phase completion** __DOCS__\phase3\PHASE_3_COMPLETION_REPORT.md
+
 ### Key Resources
 - **Three.js Docs**: https://threejs.org/docs/
 - **Rapier.js Docs**: https://rapier.rs/docs/
@@ -581,6 +591,10 @@
 - **Team Discord/Slack**: [Insert link]
 - **GitHub Repo**: [Insert link]
 - **Trello/Jira Board**: [Insert link]
+
+
+
+
 
 ---
 
