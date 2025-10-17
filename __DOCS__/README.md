@@ -13,7 +13,7 @@
   ## Controls
   **Keyboard:**
   - W/Up Arrow: Accelerate
-  - S/Down Arrow: Brake
+  - S/Down Arrow: Brake/reverse
   - A/Left Arrow: Steer left
   - D/Right Arrow: Steer right
   - Space: Handbrake
@@ -22,7 +22,7 @@
 
   **Gamepad:**
   - Right Trigger: Accelerate
-  - Left Trigger: Brake
+  - Left Trigger: Brake/Reverse
   - Left Stick: Steering
   - A Button: Handbrake
 
@@ -191,6 +191,16 @@
 - **Team Discord/Slack**: [Insert link]
 - **GitHub Repo**: [Insert link]
 - **Trello/Jira Board**: [Insert link]
+
+### Important Game DOCS ###
+- **Phase Docs** __DOCS__\phase1\Phase_1_ROADMAP.md
+- **Phase Docs** __DOCS__\phase2\Phase_2_ROADMAP.md
+- **Phase Docs** __DOCS__\phase3\Phase_3_ROADMAP.md
+- **phase0** __DOCS__\Pregame_roadmap.md
+- **Game Authority** __DOCS__\PRD.md
+- **Phase completion** __DOCS__\phase1\PHASE_1B_COMPLETION_REPORT.md
+- **Phase completion** __DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md
+- **Phase completion** __DOCS__\phase3\PHASE_3_COMPLETION_REPORT.md
 
 ---
 

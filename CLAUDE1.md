@@ -24,6 +24,7 @@ This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade
 **Read These First**:
 1. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\PRD.md` - Product Requirements (THE authoritative source)
 2. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\{PHASE}\[Phase]_[#]_ROADMAP.md` - Phase-by-phase development plan for your phase
+
 3. `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\phase3\PHASE_3_COMPLETION_REPORT.md` - What we just finished
 
 **Key Commands**:
