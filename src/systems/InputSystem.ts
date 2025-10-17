@@ -32,6 +32,7 @@ export interface VehicleInput {
   handbrake: boolean;    // true/false
   reset: boolean;        // true/false (respawn vehicle)
   pause: boolean;        // true/false (pause game)
+  skipReplay?: boolean;  // true/false (skip replay during crash sequence)
 }
 
 /**
@@ -64,6 +65,7 @@ export interface KeyBindings {
   reset: string;
   pauseEscape: string;
   pauseP: string;
+  skipReplay: string;
 }
 
 /**
@@ -76,6 +78,7 @@ export interface GamepadMapping {
   handbrake: number;     // A/X button
   reset: number;         // B/Circle button
   pause: number;         // Start button
+  skipReplay: number;    // Y/Triangle button
 }
 
 /**
@@ -110,6 +113,7 @@ const DEFAULT_KEY_BINDINGS: KeyBindings = {
   reset: 'KeyR',
   pauseEscape: 'Escape',
   pauseP: 'KeyP',
+  skipReplay: 'Space', // Use space to skip replay
 };
 
 /**
@@ -122,6 +126,7 @@ const DEFAULT_GAMEPAD_MAPPING: GamepadMapping = {
   handbrake: 0,      // A button (Xbox) / X button (PlayStation)
   reset: 1,          // B button (Xbox) / Circle button (PlayStation)
   pause: 9,          // Start button
+  skipReplay: 3,     // Y button (Xbox) / Triangle button (PlayStation)
 };
 
 /**
@@ -146,6 +151,7 @@ export class InputSystem {
     handbrake: false,
     reset: false,
     pause: false,
+    skipReplay: false,
   };
 
   // Raw input values (before smoothing)
@@ -157,6 +163,7 @@ export class InputSystem {
   private prevReset = false;
   private prevPause = false;
   private prevHandbrake = false;
+  private prevSkipReplay = false;
 
   // Event handlers (bound for proper cleanup)
   private keyDownHandler = this.onKeyDown.bind(this);
@@ -315,6 +322,11 @@ export class InputSystem {
     const pausePressed = this.keysPressed.has(keys.pauseEscape) || this.keysPressed.has(keys.pauseP);
     this.currentInput.pause = pausePressed && !this.prevPause;
     this.prevPause = pausePressed;
+
+    // Skip Replay (edge-triggered, one-shot)
+    const skipReplayPressed = this.keysPressed.has(keys.skipReplay);
+    this.currentInput.skipReplay = skipReplayPressed && !this.prevSkipReplay;
+    this.prevSkipReplay = skipReplayPressed;
   }
 
   /**
@@ -370,6 +382,11 @@ export class InputSystem {
     const pausePressed = gamepad.buttons[mapping.pause]?.pressed || false;
     this.currentInput.pause = pausePressed && !this.prevPause;
     this.prevPause = pausePressed;
+
+    // Skip Replay (Y/Triangle button - edge-triggered)
+    const skipReplayPressed = gamepad.buttons[mapping.skipReplay]?.pressed || false;
+    this.currentInput.skipReplay = skipReplayPressed && !this.prevSkipReplay;
+    this.prevSkipReplay = skipReplayPressed;
   }
 
   /**
@@ -500,6 +517,7 @@ export class InputSystem {
     this.currentInput.handbrake = false;
     this.currentInput.reset = false;
     this.currentInput.pause = false;
+    this.currentInput.skipReplay = false;
 
     this.rawThrottle = 0;
     this.rawBrake = 0;
@@ -508,6 +526,7 @@ export class InputSystem {
     this.prevReset = false;
     this.prevPause = false;
     this.prevHandbrake = false;
+    this.prevSkipReplay = false;
 
     this.keysPressed.clear();
   }

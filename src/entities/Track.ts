@@ -403,8 +403,6 @@ export class Track {
       .setTranslation(0, 0, 0);
     this.rigidBody = world.world.createRigidBody(rigidBodyDesc);
 
-    console.log(`Track rigid body created: isFixed=${this.rigidBody.isFixed()}, isDynamic=${this.rigidBody.isDynamic()}`);
-
     // Create static trimesh collider attached to rigid body
     const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
 

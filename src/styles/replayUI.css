@@ -1,0 +1,431 @@
+/**
+ * ReplayUI Styles - Crash replay overlay styling
+ *
+ * Design:
+ * - Retro-futuristic arcade aesthetic
+ * - Cyan (#00ffff) and magenta (#ff00ff) accent colors
+ * - Monospace font for authentic arcade feel
+ * - Smooth animations for transitions
+ * - High contrast for readability
+ *
+ * Performance:
+ * - Uses CSS transforms for animations (GPU-accelerated)
+ * - No expensive blur filters in hot path
+ * - Z-index management to layer properly
+ *
+ * Accessibility:
+ * - High contrast text (white on dark background)
+ * - Focus indicators for keyboard navigation
+ * - Reduced motion support via prefers-reduced-motion
+ */
+
+/* Container - Fixed overlay covering entire viewport */
+.replay-ui-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+
+  /* Semi-transparent dark background */
+  background-color: rgba(10, 10, 20, 0.8);
+
+  /* Fade animation */
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Show state - make visible and interactive */
+.replay-ui-container.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Main overlay - centered content */
+.replay-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  /* Content sizing and spacing */
+  min-width: 400px;
+  max-width: 600px;
+  padding: 40px;
+
+  /* Background: dark with glowing border */
+  background: linear-gradient(
+    135deg,
+    rgba(20, 20, 30, 0.95) 0%,
+    rgba(10, 10, 25, 0.95) 100%
+  );
+
+  border: 2px solid #00ffff;
+  border-radius: 8px;
+
+  /* Glow effect for retro arcade feel */
+  box-shadow:
+    0 0 10px rgba(0, 255, 255, 0.3),
+    0 0 20px rgba(255, 0, 255, 0.2),
+    inset 0 0 20px rgba(0, 255, 255, 0.1);
+
+  /* Entrance animation */
+  animation: overlayEnter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Entrance animation for smooth pop-in */
+@keyframes overlayEnter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Title - "CRASH REPLAY" */
+.replay-title {
+  font-family: 'Courier New', monospace;
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-align: center;
+
+  /* Retro arcade colors with alternating glow */
+  color: #00ffff;
+  text-shadow:
+    0 0 10px rgba(0, 255, 255, 0.8),
+    0 0 20px rgba(255, 0, 255, 0.4),
+    2px 2px 4px rgba(0, 0, 0, 0.8);
+
+  margin: 0 0 30px 0;
+
+  /* Pulse animation for emphasis */
+  animation: titlePulse 2s ease-in-out infinite;
+}
+
+/* Subtle pulse animation for the title */
+@keyframes titlePulse {
+  0%, 100% {
+    text-shadow:
+      0 0 10px rgba(0, 255, 255, 0.8),
+      0 0 20px rgba(255, 0, 255, 0.4),
+      2px 2px 4px rgba(0, 0, 0, 0.8);
+  }
+  50% {
+    text-shadow:
+      0 0 15px rgba(0, 255, 255, 1),
+      0 0 30px rgba(255, 0, 255, 0.6),
+      2px 2px 4px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Progress bar - replay playback progress */
+.replay-progress {
+  width: 100%;
+  height: 20px;
+  margin: 0 0 30px 0;
+
+  /* Reset default appearance */
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+
+  /* Custom track styling */
+  background: rgba(50, 50, 70, 0.8);
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  overflow: hidden;
+
+  cursor: pointer;
+  outline: none;
+}
+
+/* Chrome/Edge progress bar - fill color */
+.replay-progress::-webkit-progress-value {
+  background: linear-gradient(
+    90deg,
+    #00ffff 0%,
+    #00aa88 50%,
+    #00ffff 100%
+  );
+
+  border-radius: 8px;
+  box-shadow:
+    0 0 8px rgba(0, 255, 255, 0.8),
+    inset 0 0 4px rgba(255, 255, 255, 0.3);
+
+  transition: width 0.1s linear;
+}
+
+/* Chrome/Edge progress bar - track color */
+.replay-progress::-webkit-progress-bar {
+  background: rgba(50, 50, 70, 0.8);
+  border-radius: 8px;
+}
+
+/* Firefox progress bar - fill color */
+.replay-progress::-moz-progress-bar {
+  background: linear-gradient(
+    90deg,
+    #00ffff 0%,
+    #00aa88 50%,
+    #00ffff 100%
+  );
+
+  border-radius: 8px;
+  box-shadow:
+    0 0 8px rgba(0, 255, 255, 0.8),
+    inset 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Skip button */
+.skip-button {
+  width: 100%;
+  padding: 12px 20px;
+
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  color: #1a1a2e;
+  background: linear-gradient(
+    135deg,
+    #00ffff 0%,
+    #00cc99 100%
+  );
+
+  border: 2px solid #00ffff;
+  border-radius: 4px;
+
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+
+  box-shadow:
+    0 4px 12px rgba(0, 255, 255, 0.3),
+    0 0 10px rgba(0, 255, 255, 0.2);
+
+  outline: none;
+}
+
+/* Skip button - hover state */
+.skip-button:hover {
+  background: linear-gradient(
+    135deg,
+    #00ffff 0%,
+    #00ff99 100%
+  );
+
+  box-shadow:
+    0 6px 16px rgba(0, 255, 255, 0.5),
+    0 0 20px rgba(0, 255, 255, 0.3),
+    inset 0 0 8px rgba(255, 255, 255, 0.2);
+
+  transform: translateY(-2px);
+}
+
+/* Skip button - focus state (keyboard navigation) */
+.skip-button:focus {
+  outline: 3px solid #ff00ff;
+  outline-offset: 2px;
+}
+
+/* Skip button - active/pressed state */
+.skip-button:active,
+.skip-button.pressed {
+  background: linear-gradient(
+    135deg,
+    #00cc88 0%,
+    #009966 100%
+  );
+
+  box-shadow:
+    0 2px 8px rgba(0, 255, 255, 0.3),
+    inset 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  transform: translateY(0);
+}
+
+/* Skip button - disabled state */
+.skip-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .replay-ui-container {
+    transition: opacity 0.1s linear;
+  }
+
+  .replay-overlay {
+    animation: none;
+  }
+
+  .replay-title {
+    animation: none;
+    text-shadow:
+      0 0 10px rgba(0, 255, 255, 0.8),
+      0 0 20px rgba(255, 0, 255, 0.4);
+  }
+
+  .replay-progress::-webkit-progress-value {
+    transition: width 0s;
+  }
+
+  .skip-button {
+    transition: all 0s;
+  }
+}
+
+/* Responsive: Adjust for smaller screens */
+@media (max-width: 768px) {
+  .replay-overlay {
+    min-width: 90%;
+    max-width: 90%;
+    padding: 30px;
+  }
+
+  .replay-title {
+    font-size: 24px;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+  }
+
+  .replay-progress {
+    height: 16px;
+    margin-bottom: 20px;
+  }
+
+  .skip-button {
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+}
+
+/* Responsive: Extra small screens */
+@media (max-width: 480px) {
+  .replay-overlay {
+    min-width: 85%;
+    max-width: 85%;
+    padding: 20px;
+  }
+
+  .replay-title {
+    font-size: 20px;
+    letter-spacing: 0.5px;
+    margin-bottom: 15px;
+  }
+
+  .replay-progress {
+    height: 14px;
+    margin-bottom: 15px;
+  }
+
+  .skip-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
+/* Dark theme - default, no change needed */
+/* Light theme variant (for future use) */
+@media (prefers-color-scheme: light) {
+  .replay-ui-container {
+    background-color: rgba(240, 240, 250, 0.9);
+  }
+
+  .replay-overlay {
+    background: linear-gradient(
+      135deg,
+      rgba(250, 250, 255, 0.98) 0%,
+      rgba(240, 240, 250, 0.98) 100%
+    );
+
+    border-color: #00aaff;
+    box-shadow:
+      0 0 10px rgba(0, 170, 255, 0.3),
+      0 0 20px rgba(255, 100, 255, 0.2),
+      inset 0 0 20px rgba(0, 170, 255, 0.1);
+  }
+
+  .replay-title {
+    color: #0077cc;
+    text-shadow:
+      0 0 10px rgba(0, 170, 255, 0.6),
+      0 0 20px rgba(255, 100, 255, 0.3),
+      2px 2px 4px rgba(255, 255, 255, 0.8);
+  }
+
+  @keyframes titlePulse {
+    0%, 100% {
+      text-shadow:
+        0 0 10px rgba(0, 170, 255, 0.6),
+        0 0 20px rgba(255, 100, 255, 0.3),
+        2px 2px 4px rgba(255, 255, 255, 0.8);
+    }
+    50% {
+      text-shadow:
+        0 0 15px rgba(0, 170, 255, 0.8),
+        0 0 30px rgba(255, 100, 255, 0.5),
+        2px 2px 4px rgba(255, 255, 255, 0.8);
+    }
+  }
+
+  .replay-progress {
+    background: rgba(200, 200, 220, 0.6);
+    border-color: #0077cc;
+  }
+
+  .replay-progress::-webkit-progress-bar {
+    background: rgba(200, 200, 220, 0.6);
+  }
+
+  .skip-button {
+    color: #ffffff;
+    background: linear-gradient(
+      135deg,
+      #0077cc 0%,
+      #005599 100%
+    );
+
+    border-color: #0077cc;
+    box-shadow:
+      0 4px 12px rgba(0, 119, 204, 0.3),
+      0 0 10px rgba(0, 119, 204, 0.2);
+  }
+
+  .skip-button:hover {
+    background: linear-gradient(
+      135deg,
+      #0088dd 0%,
+      #0066aa 100%
+    );
+
+    box-shadow:
+      0 6px 16px rgba(0, 119, 204, 0.5),
+      0 0 20px rgba(0, 119, 204, 0.3);
+  }
+
+  .skip-button:focus {
+    outline-color: #ff0099;
+  }
+}
+
+/* Very high DPI displays */
+@media (min-resolution: 192dpi) {
+  .replay-overlay {
+    border-width: 1px;
+  }
+
+  .skip-button {
+    border-width: 1px;
+  }
+}

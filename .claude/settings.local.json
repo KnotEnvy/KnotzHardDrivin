@@ -15,7 +15,8 @@
       "Bash(tee:*)",
       "Bash(npx playwright test:*)",
       "Bash(npx playwright:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Read(//d/**)"
     ],
     "deny": [],
     "ask": []

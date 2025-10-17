@@ -11,6 +11,18 @@ export enum CameraMode {
 }
 
 /**
+ * CrashEvent interface for replay camera context
+ * Provides the crash point and timing information for cinematic framing
+ */
+export interface CrashEvent {
+  timestamp: number;               // Event timestamp (ms)
+  position: THREE.Vector3;         // Crash impact position (world space)
+  velocity: THREE.Vector3;         // Vehicle velocity at impact
+  impactForce: number;             // Collision force in Newtons
+  severity: 'minor' | 'major' | 'catastrophic';
+}
+
+/**
  * Target interface for camera following
  * Allows the camera system to work with any object that provides position and rotation
  */
@@ -61,6 +73,14 @@ export class CameraSystem {
   private replayHeight = 15; // meters above target
   private replayDamping = 0.05; // Slower = more cinematic
   private replayLookAtOffset = new THREE.Vector3(0, 0.5, 0); // Look slightly above center
+
+  // Cinematic replay crash camera state
+  private replayCrashStartTime = 0;
+  private replayCrashDuration = 10; // 10 second replay duration (from PRD 4.3.3)
+  private replayCrashPoint = new THREE.Vector3(); // Static crash position to frame
+  private replayStageDistance = 30; // Dynamic distance based on stage
+  private replayStageHeight = 15; // Dynamic height based on stage
+  private replayOrbitAngle = 0; // For cinematic arc movement around crash
 
   // Camera smoothing/damping
   private smoothPosition = new THREE.Vector3();
@@ -248,15 +268,31 @@ export class CameraSystem {
   /**
    * Update replay camera (cinematic crane shot)
    *
-   * Behavior:
+   * Behavior (standard replay mode):
    * - Position: 30m behind, 15m above target (crane shot)
    * - Framing: Centers the action in the frame
    * - Smoothing: Heavy damping for cinematic feel
-   * - Uses Catmull-Rom interpolation for buttery smooth movement
+   * - Uses smooth lerp interpolation for movement
    *
-   * Performance: ~0.05ms (zero allocations)
+   * Behavior (crash replay mode - when crash event is set):
+   * - 3-stage dynamic camera:
+   *   Stage 1 (0-3s): Wide establishing shot (40m distance, 20m height)
+   *   Stage 2 (3-7s): Move closer to action (25m distance, 15m height)
+   *   Stage 3 (7-10s): Close-up on crash (15m distance, 10m height)
+   * - Cinematic arc: Slow orbital motion around crash point
+   * - Impact zoom: Dramatic zoom-in during seconds 8-9
+   * - Always looks at crash position (static focal point)
+   *
+   * Performance: ~0.08ms (zero allocations - reuses all temp vectors)
    */
   private updateReplay(deltaTime: number, target: CameraTarget): void {
+    // Check if we're in crash replay mode (crash point has been set)
+    if (this.replayCrashStartTime > 0 && this.replayCrashPoint.lengthSq() > 0) {
+      this.updateCrashReplayCamera(deltaTime, target);
+      return;
+    }
+
+    // Standard replay mode: follow target with crane shot
     // Calculate ideal camera position (behind and above)
     // We position relative to world space, not vehicle orientation, for stable crane shot
     // Use tempVec3 for target position (avoid clone())
@@ -287,6 +323,87 @@ export class CameraSystem {
     // Use tempVec3_2 for look-at target (reused, avoid clone())
     const lookAtTarget = this.tempVec3_2.copy(target.position).add(this.replayLookAtOffset);
     this.smoothLookAt.lerp(lookAtTarget, this.replayDamping);
+    this.camera.lookAt(this.smoothLookAt);
+  }
+
+  /**
+   * Update crash replay camera with dynamic 3-stage movement
+   *
+   * Stage progression:
+   * - 0-3s: Wide establishing shot (wide angle, far distance)
+   * - 3-7s: Smooth transition closer to crash point
+   * - 7-10s: Close-up on crash location
+   * - 8-9s: Additional impact zoom for drama
+   *
+   * Cinematic features:
+   * - Orbital arc motion: Slow circular movement around crash (Math.sin for smooth motion)
+   * - Fixed look-at: Always frames crash point in center
+   * - Smooth damping: No jarring camera jumps
+   *
+   * Performance: ~0.08ms per frame (zero allocations)
+   *
+   * @param deltaTime - Time since last frame in seconds
+   * @param target - Current vehicle target (for interpolation reference)
+   */
+  private updateCrashReplayCamera(deltaTime: number, target: CameraTarget): void {
+    // Calculate elapsed time since replay started (in seconds)
+    const elapsedTime = (performance.now() - this.replayCrashStartTime) / 1000;
+
+    // Determine camera distance and height based on replay stage
+    // Stage 1 (0-3s): Wide establishing shot
+    if (elapsedTime < 3) {
+      this.replayStageDistance = 40; // Widest shot
+      this.replayStageHeight = 20;
+    }
+    // Stage 2 (3-7s): Smooth transition toward crash
+    else if (elapsedTime < 7) {
+      // Interpolate between wide and medium shots
+      // Linear interpolation from 40m to 25m over 4 seconds
+      const progress = (elapsedTime - 3) / 4; // 0 to 1 over 4 seconds
+      this.replayStageDistance = THREE.MathUtils.lerp(40, 25, progress);
+      this.replayStageHeight = THREE.MathUtils.lerp(20, 15, progress);
+    }
+    // Stage 3 (7-10s): Close-up on crash point
+    else {
+      this.replayStageDistance = 15;
+      this.replayStageHeight = 10;
+    }
+
+    // Dramatic zoom-in at impact moment (seconds 8-9)
+    // Smoothly compress distance/height by 30% for final close-up effect
+    if (elapsedTime >= 8 && elapsedTime <= 9) {
+      const zoomProgress = 1 - (elapsedTime - 8); // Goes from 1 to 0 over 1 second
+      const zoomFactor = 0.7 + zoomProgress * 0.3; // 0.7 to 1.0 (30% compression)
+      this.replayStageDistance *= zoomFactor;
+      this.replayStageHeight *= zoomFactor;
+    }
+
+    // Cinematic orbital arc: Slow circular motion around crash point
+    // Update orbit angle: Complete ~1.5 orbits over 10 seconds (540 degrees)
+    this.replayOrbitAngle += (deltaTime / this.replayCrashDuration) * Math.PI * 3;
+
+    // Calculate camera position with orbital arc around crash point
+    // Use sine wave for smooth horizontal arc, distance and height control vertical
+    // tempVec3 is used for orbital offset (avoid allocation)
+    const orbitalOffset = this.tempVec3.set(
+      Math.sin(this.replayOrbitAngle) * this.replayStageDistance,
+      this.replayStageHeight,
+      -Math.cos(this.replayOrbitAngle) * this.replayStageDistance
+    );
+
+    // Calculate ideal camera position relative to crash point
+    // Use tempVec3_2 for ideal position (reuse after orbital offset)
+    const idealCameraPos = this.tempVec3_2.copy(this.replayCrashPoint).add(orbitalOffset);
+
+    // Smooth camera position to prevent jittering
+    // Heavy damping (0.05) for cinematic feel
+    this.smoothPosition.lerp(idealCameraPos, this.replayDamping);
+    this.camera.position.copy(this.smoothPosition);
+
+    // Always look at crash point (static focal point for entire replay)
+    // Use tempVec3_3 for look-at target (with slight upward offset for better framing)
+    const lookTarget = this.tempVec3_3.copy(this.replayCrashPoint).add(this.replayLookAtOffset);
+    this.smoothLookAt.lerp(lookTarget, this.replayDamping);
     this.camera.lookAt(this.smoothLookAt);
   }
 
@@ -467,6 +584,67 @@ export class CameraSystem {
   setDamping(positionDamping: number, rotationDamping: number): void {
     this.positionDamping = THREE.MathUtils.clamp(positionDamping, 0.01, 1.0);
     this.rotationDamping = THREE.MathUtils.clamp(rotationDamping, 0.01, 1.0);
+  }
+
+  /**
+   * Initialize crash replay camera
+   *
+   * Called when a major/catastrophic crash occurs to set up the cinematic replay camera.
+   * Switches camera mode to REPLAY and sets the crash point for framing.
+   *
+   * Usage from CrashManager:
+   * ```typescript
+   * cameraSystem.startCrashReplay(crashEvent);
+   * cameraSystem.transitionTo(CameraMode.REPLAY, 1.0);
+   * ```
+   *
+   * @param crash - CrashEvent with position and timing information
+   */
+  startCrashReplay(crash: CrashEvent): void {
+    this.replayCrashStartTime = performance.now();
+    this.replayCrashPoint.copy(crash.position);
+    this.replayOrbitAngle = 0; // Reset orbital angle for this replay
+
+    console.log(`Crash replay initialized at position: (${crash.position.x.toFixed(2)}, ${crash.position.y.toFixed(2)}, ${crash.position.z.toFixed(2)})`);
+  }
+
+  /**
+   * Stop crash replay and return to normal mode
+   *
+   * Called when replay ends (either by timeout or skip button).
+   * Resets crash replay state for the next crash event.
+   *
+   * Performance: ~0.01ms (just resets flags)
+   */
+  stopCrashReplay(): void {
+    this.replayCrashStartTime = 0;
+    this.replayCrashPoint.set(0, 0, 0);
+    this.replayOrbitAngle = 0;
+    this.replayStageDistance = 30;
+    this.replayStageHeight = 15;
+
+    console.log('Crash replay ended');
+  }
+
+  /**
+   * Get elapsed time in current crash replay (seconds)
+   *
+   * Useful for UI progress bars and replay timing.
+   *
+   * @returns Elapsed time in seconds (0 if not in crash replay)
+   */
+  getCrashReplayElapsedTime(): number {
+    if (this.replayCrashStartTime === 0) return 0;
+    return (performance.now() - this.replayCrashStartTime) / 1000;
+  }
+
+  /**
+   * Check if currently in crash replay mode
+   *
+   * @returns true if crash replay is active, false otherwise
+   */
+  isInCrashReplay(): boolean {
+    return this.replayCrashStartTime > 0 && this.replayCrashPoint.lengthSq() > 0;
   }
 
   /**

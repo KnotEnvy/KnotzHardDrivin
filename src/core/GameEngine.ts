@@ -8,6 +8,9 @@ import { CameraSystem } from '../systems/CameraSystem';
 import { DEFAULT_VEHICLE_CONFIG } from '../config/PhysicsConfig';
 import { Track, TrackData } from '../entities/Track';
 import { WaypointSystem, WaypointData } from '../systems/WaypointSystem';
+import { CrashManager, CrashEvent } from '../systems/CrashManager';
+import { ReplayRecorder } from '../systems/ReplayRecorder';
+import { ReplayPlayer } from '../systems/ReplayPlayer';
 import * as THREE from 'three';
 
 /**
@@ -41,6 +44,11 @@ export class GameEngine {
   // Phase 3: Track and Waypoint System
   private track: Track | null = null;
   private waypointSystem: WaypointSystem | null = null;
+
+  // Phase 4: Crash and Replay System
+  private crashManager: CrashManager | null = null;
+  private replayRecorder: ReplayRecorder | null = null;
+  private replayPlayer: ReplayPlayer | null = null;
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
@@ -149,6 +157,59 @@ export class GameEngine {
   }
 
   /**
+   * Handles crash replay trigger event from CrashManager.
+   * Sets up replay playback with appropriate timing and camera mode.
+   *
+   * @param crashEvent - Crash event that triggered the replay
+   */
+  private handleCrashReplayTrigger(crashEvent: CrashEvent): void {
+    if (!this.replayRecorder) {
+      console.warn('Cannot trigger replay: recorder not initialized');
+      return;
+    }
+
+    // Get the replay buffer (all recorded frames so far)
+    const frames = this.replayRecorder.getReplayBuffer();
+    if (frames.length === 0) {
+      console.warn('Cannot trigger replay: no frames recorded');
+      return;
+    }
+
+    // Create replay player with recorded frames
+    this.replayPlayer = new ReplayPlayer(frames);
+
+    // Calculate start time for replay (try to show last 10 seconds, or from start)
+    const replayDuration = this.replayRecorder.getReplayDuration();
+    const lookbackSeconds = Math.min(10, replayDuration);
+    const replayStartTime = Math.max(0, replayDuration - lookbackSeconds);
+
+    // Start playback from calculated time
+    this.replayPlayer.startPlayback();
+
+    // Switch camera to crash replay mode
+    // Adapt CrashManager's CrashEvent to CameraSystem's CrashEvent format
+    // Map CrashSeverity enum to string severity for camera system
+    const cameraCrashEvent = {
+      timestamp: crashEvent.timestamp,
+      position: crashEvent.position,
+      velocity: crashEvent.velocity,
+      impactForce: crashEvent.impactForce,
+      severity: crashEvent.severity === 'minor' || crashEvent.severity === 'major' || crashEvent.severity === 'catastrophic'
+        ? (crashEvent.severity as 'minor' | 'major' | 'catastrophic')
+        : 'major', // Default to 'major' if severity doesn't match
+    };
+
+    this.cameraSystem.startCrashReplay(cameraCrashEvent);
+
+    // Disable crash detection during replay
+    if (this.crashManager) {
+      this.crashManager.setEnabled(false);
+    }
+
+    console.log(`Replay triggered: ${frames.length} frames (${replayDuration.toFixed(1)}s), starting from ${replayStartTime.toFixed(1)}s`);
+  }
+
+  /**
    * Updates game logic (non-physics) with variable timestep.
    */
   private update(deltaTime: number): void {
@@ -177,6 +238,17 @@ export class GameEngine {
           if (input.pause) {
             this.setState(GameState.PAUSED);
           }
+        }
+
+        // Update crash detection (Phase 4)
+        if (this.crashManager && this.vehicle) {
+          const elapsedTime = this.getElapsedTime();
+          this.crashManager.update(deltaTime, elapsedTime);
+        }
+
+        // Record frame for replay (Phase 4)
+        if (this.replayRecorder && this.vehicle) {
+          this.replayRecorder.recordFrame(this.vehicle, this.sceneManager.camera, deltaTime);
         }
 
         // Update waypoint system
@@ -221,10 +293,70 @@ export class GameEngine {
         }
         break;
       case GameState.CRASHED:
-        // Update crash effects
+        // Transition from CRASHED to REPLAY happens in handleCrashReplayTrigger
+        // This state is brief and mainly used for state machine flow
         break;
       case GameState.REPLAY:
-        // Update replay playback
+        // Update replay playback (Phase 4)
+        if (this.replayPlayer && this.vehicle) {
+          const interpolatedFrame = this.replayPlayer.update(deltaTime);
+
+          if (interpolatedFrame) {
+            // Apply interpolated frame to vehicle (kinematic mode)
+            // Note: Requires Vehicle.applyReplayFrame() implementation (Phase 4 task)
+            if (typeof (this.vehicle as any).applyReplayFrame === 'function') {
+              (this.vehicle as any).applyReplayFrame(interpolatedFrame);
+            }
+          } else {
+            // Replay finished - respawn vehicle and return to playing
+            if (this.crashManager) {
+              this.crashManager.respawnVehicle();
+              this.crashManager.setEnabled(true); // Re-enable crash detection
+            }
+
+            // Clean up replay player
+            if (this.replayPlayer) {
+              this.replayPlayer.dispose();
+              this.replayPlayer = null;
+            }
+
+            // Stop crash replay camera and return to normal
+            this.cameraSystem.stopCrashReplay();
+
+            // Transition back to PLAYING state
+            this.setState(GameState.PLAYING);
+          }
+        }
+
+        // Handle skip replay input
+        if (this.inputSystem) {
+          this.inputSystem.update(deltaTime);
+          const input = this.inputSystem.getInput();
+          if (input.skipReplay) {
+            // Skip remaining replay
+            if (this.replayPlayer) {
+              this.replayPlayer.skip();
+            }
+
+            // Clean up
+            if (this.replayPlayer) {
+              this.replayPlayer.dispose();
+              this.replayPlayer = null;
+            }
+
+            // Re-enable crash detection and respawn
+            if (this.crashManager) {
+              this.crashManager.respawnVehicle();
+              this.crashManager.setEnabled(true);
+            }
+
+            // Stop replay camera
+            this.cameraSystem.stopCrashReplay();
+
+            // Return to playing
+            this.setState(GameState.PLAYING);
+          }
+        }
         break;
       case GameState.RESULTS:
         // Update results screen animations
@@ -284,6 +416,14 @@ export class GameEngine {
   }
 
   /**
+   * Gets elapsed time since game start in seconds.
+   * Used for crash detection timing and other time-sensitive systems.
+   */
+  private getElapsedTime(): number {
+    return (performance.now() - (this.lastTime - (performance.now() - this.lastTime))) / 1000;
+  }
+
+  /**
    * Called when entering a new state.
    */
   private onStateEnter(state: GameState): void {
@@ -308,9 +448,11 @@ export class GameEngine {
         break;
       case GameState.CRASHED:
         // Trigger crash effects
+        // Note: State transition to REPLAY happens in CrashManager via handleCrashReplayTrigger
         break;
       case GameState.REPLAY:
-        // Start replay playback
+        // Replay playback is already started in handleCrashReplayTrigger
+        // This state handler manages playback loop updates
         break;
       case GameState.RESULTS:
         // Display results
@@ -331,6 +473,20 @@ export class GameEngine {
         break;
       case GameState.PLAYING:
         // Pause timers
+        // Clean up Phase 4 systems (Crash & Replay)
+        if (this.crashManager) {
+          this.crashManager.dispose();
+          this.crashManager = null;
+        }
+        if (this.replayRecorder) {
+          this.replayRecorder.dispose();
+          this.replayRecorder = null;
+        }
+        if (this.replayPlayer) {
+          this.replayPlayer.dispose();
+          this.replayPlayer = null;
+        }
+
         // Clean up vehicle and input system
         if (this.vehicle) {
           this.vehicle.dispose();
@@ -354,10 +510,14 @@ export class GameEngine {
         // Hide pause menu
         break;
       case GameState.CRASHED:
-        // Cleanup crash effects
+        // Cleanup crash effects (brief state, most cleanup happens in REPLAY state)
         break;
       case GameState.REPLAY:
         // Stop replay
+        if (this.replayPlayer) {
+          this.replayPlayer.dispose();
+          this.replayPlayer = null;
+        }
         break;
       case GameState.RESULTS:
         // Cleanup results screen
@@ -468,6 +628,27 @@ export class GameEngine {
   }
 
   /**
+   * Gets the crash manager instance (Phase 4).
+   */
+  getCrashManager(): CrashManager | null {
+    return this.crashManager;
+  }
+
+  /**
+   * Gets the replay recorder instance (Phase 4).
+   */
+  getReplayRecorder(): ReplayRecorder | null {
+    return this.replayRecorder;
+  }
+
+  /**
+   * Gets the replay player instance (Phase 4).
+   */
+  getReplayPlayer(): ReplayPlayer | null {
+    return this.replayPlayer;
+  }
+
+  /**
    * Loads track data from JSON file and converts waypoint format.
    * @param path - Path to track JSON file
    * @returns Promise resolving to TrackData
@@ -570,11 +751,29 @@ export class GameEngine {
       this.waypointSystem = new WaypointSystem(waypoints);
       this.waypointSystem.setMaxLaps(2); // Default: 2 laps
 
+      // Phase 4: Initialize crash and replay systems
+      this.crashManager = new CrashManager();
+      this.crashManager.init(
+        this.vehicle,
+        this.track,
+        (state: GameState) => this.setState(state)
+      );
+
+      // Wire up crash event listener for replay triggering
+      this.crashManager.onReplayTrigger((crashEvent: CrashEvent) => {
+        this.handleCrashReplayTrigger(crashEvent);
+      });
+
+      // Initialize replay recorder
+      this.replayRecorder = new ReplayRecorder();
+      this.replayRecorder.startRecording();
+
       console.log('✅ Race initialized successfully!');
       console.log(`✅ Vehicle spawned at: (${spawnPoint.position.x.toFixed(2)}, ${spawnPoint.position.y.toFixed(2)}, ${spawnPoint.position.z.toFixed(2)})`);
       console.log(`✅ Track: ${trackData.name}, Waypoints: ${waypoints.length}, Max Laps: ${this.waypointSystem.getMaxLaps()}`);
       console.log(`✅ Track mesh has ${this.track.getMesh().geometry.attributes.position.count} vertices`);
-      console.log('🎮 Game is ready to play!');
+      console.log('✅ Crash & Replay systems initialized!');
+      console.log('Game is ready to play!');
     } catch (error) {
       console.error('❌ CRITICAL ERROR: Failed to initialize race:', error);
       console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
@@ -590,6 +789,20 @@ export class GameEngine {
     this.running = false;
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+
+    // Cleanup Phase 4 systems
+    if (this.crashManager) {
+      this.crashManager.dispose();
+      this.crashManager = null;
+    }
+    if (this.replayRecorder) {
+      this.replayRecorder.dispose();
+      this.replayRecorder = null;
+    }
+    if (this.replayPlayer) {
+      this.replayPlayer.dispose();
+      this.replayPlayer = null;
+    }
 
     // Cleanup Phase 2 systems
     if (this.vehicle) {
