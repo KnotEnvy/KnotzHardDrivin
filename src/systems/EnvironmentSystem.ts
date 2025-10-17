@@ -717,8 +717,10 @@ export class EnvironmentSystem {
         cloud.geometry.dispose();
         if (cloud.material instanceof THREE.Material) {
           cloud.material.dispose();
-          if (cloud.material.map) {
-            cloud.material.map.dispose();
+          // Check if material has map property (MeshBasicMaterial, MeshStandardMaterial, etc.)
+          const material = cloud.material as any;
+          if (material.map && material.map instanceof THREE.Texture) {
+            material.map.dispose();
           }
         }
       });

@@ -606,14 +606,25 @@ describe('InputSystem', () => {
       expect(inputSystem.getActiveDevice()).toBe(InputDevice.KEYBOARD);
     });
 
-    it('should return input copy (not reference)', () => {
+    it('should return input reference (zero-alloc optimization, READ ONLY contract)', () => {
       const input1 = inputSystem.getInput();
       const input2 = inputSystem.getInput();
 
-      // Different references (for safety - prevents external mutation)
-      expect(input1).not.toBe(input2);
-      // But same values
+      // Same reference to internal state (zero-alloc optimization)
+      // Caller must NOT mutate - treated as read-only contract
+      expect(input1).toBe(input2);
+      // Same values since it's the same reference
       expect(input1).toEqual(input2);
+
+      // Values should match current internal state
+      const keyDown = new KeyboardEvent('keydown', { code: 'KeyW' });
+      window.dispatchEvent(keyDown);
+      inputSystem.update(0.016);
+
+      const input3 = inputSystem.getInput();
+      // Same reference, but values have changed
+      expect(input3).toBe(input1); // Same reference
+      expect(input3.throttle).toBeGreaterThan(0); // But throttle increased
     });
   });
 

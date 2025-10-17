@@ -36,8 +36,8 @@ describe('CameraSystem', () => {
   });
 
   describe('constructor', () => {
-    it('should initialize with first-person mode', () => {
-      expect(cameraSystem.getMode()).toBe(CameraMode.FIRST_PERSON);
+    it('should initialize with chase camera mode', () => {
+      expect(cameraSystem.getMode()).toBe(CameraMode.CHASE_CAMERA);
     });
 
     it('should not be in transition initially', () => {
@@ -233,7 +233,7 @@ describe('CameraSystem', () => {
 
   describe('mode switching', () => {
     it('should switch mode immediately with setMode', () => {
-      expect(cameraSystem.getMode()).toBe(CameraMode.FIRST_PERSON);
+      expect(cameraSystem.getMode()).toBe(CameraMode.CHASE_CAMERA);
 
       cameraSystem.setMode(CameraMode.REPLAY);
 
@@ -275,7 +275,7 @@ describe('CameraSystem', () => {
       cameraSystem.transitionTo(CameraMode.REPLAY, 0.5);
 
       expect(cameraSystem.isInTransition()).toBe(true);
-      expect(cameraSystem.getMode()).toBe(CameraMode.FIRST_PERSON);
+      expect(cameraSystem.getMode()).toBe(CameraMode.CHASE_CAMERA);
 
       // Update for transition duration
       for (let i = 0; i < 35; i++) { // 35 * 0.016 = 0.56 seconds
@@ -417,7 +417,7 @@ describe('CameraSystem', () => {
       // Reset
       cameraSystem.reset();
 
-      expect(cameraSystem.getMode()).toBe(CameraMode.FIRST_PERSON);
+      expect(cameraSystem.getMode()).toBe(CameraMode.CHASE_CAMERA);
       expect(cameraSystem.isInTransition()).toBe(false);
     });
 
@@ -443,7 +443,7 @@ describe('CameraSystem', () => {
       expect(debugInfo).toHaveProperty('rotation');
       expect(debugInfo).toHaveProperty('isTransitioning');
 
-      expect(debugInfo.mode).toBe(CameraMode.FIRST_PERSON);
+      expect(debugInfo.mode).toBe(CameraMode.CHASE_CAMERA);
       expect(debugInfo.position).toBeInstanceOf(THREE.Vector3);
       expect(debugInfo.rotation).toBeInstanceOf(THREE.Euler);
       expect(typeof debugInfo.isTransitioning).toBe('boolean');

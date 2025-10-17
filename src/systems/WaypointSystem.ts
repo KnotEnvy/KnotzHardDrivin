@@ -192,10 +192,15 @@ export class WaypointSystem {
    * Gets the position of the next waypoint to reach
    * Useful for minimap visualization and navigation UI
    *
-   * @returns Clone of the next waypoint position
+   * WARNING: Returned vector is a direct reference to internal temp vector.
+   * Zero per-frame allocations - critical for performance.
+   * Caller must copy the result if persistence across frames is needed.
+   *
+   * @returns Reference to next waypoint position (temp vector - copy if needed)
    */
   getNextWaypointPosition(): THREE.Vector3 {
-    return this.waypoints[this.currentWaypoint].position.clone();
+    this.tempVec.copy(this.waypoints[this.currentWaypoint].position);
+    return this.tempVec;
   }
 
   /**

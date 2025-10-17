@@ -438,11 +438,12 @@ export class InputSystem {
 
   /**
    * Get current input state
-   * Returns a copy to prevent external mutation
-   * @returns Current vehicle input state (copy)
+   * WARNING: Returned object is a direct reference. Caller must NOT mutate it.
+   * Zero per-frame allocations - critical for 60fps gameplay loop.
+   * @returns Current vehicle input state (reference - READ ONLY)
    */
   getInput(): VehicleInput {
-    return { ...this.currentInput };
+    return this.currentInput;
   }
 
   /**

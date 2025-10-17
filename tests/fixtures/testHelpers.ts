@@ -122,11 +122,13 @@ export function randomVector3(
  * Creates a mock Rapier RigidBody for testing
  * @param position - Initial position
  * @param velocity - Initial velocity
+ * @param bodyType - Type of body: 'dynamic', 'fixed', or 'kinematicPositionBased'
  * @returns Mock rigid body object
  */
 export function createMockRigidBody(
   position: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
-  velocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0)
+  velocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0),
+  bodyType: string = 'dynamic'
 ) {
   const pos = { x: position.x, y: position.y, z: position.z };
   const vel = { x: velocity.x, y: velocity.y, z: velocity.z };
@@ -166,6 +168,8 @@ export function createMockRigidBody(
     resetTorques: vi.fn(),
     mass: () => 1200,
     setAdditionalMass: vi.fn(),
+    isFixed: vi.fn(() => bodyType === 'fixed'),
+    isDynamic: vi.fn(() => bodyType === 'dynamic'),
   };
 }
 
@@ -185,11 +189,16 @@ export function createMockPhysicsWorld(raycastResults: Array<any | null> = []) {
         return result;
       }),
       step: vi.fn(),
-      createRigidBody: vi.fn(() => createMockRigidBody()),
+      createRigidBody: vi.fn((desc: any) => {
+        // Extract body type from descriptor
+        const bodyType = desc?._type || 'dynamic';
+        return createMockRigidBody(new THREE.Vector3(), new THREE.Vector3(), bodyType);
+      }),
       createCollider: vi.fn(() => ({
         handle: Math.random(),
         friction: 1.0,
         restitution: 0.3,
+        isSensor: vi.fn(() => false),
       })),
       removeRigidBody: vi.fn(),
       removeCollider: vi.fn(),

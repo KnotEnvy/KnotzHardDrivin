@@ -230,7 +230,7 @@ export class CybertruckModel implements IVehicleModelBuilder {
    */
   private buildLights(parent: THREE.Group): void {
     // Front LED light bar
-    const frontLightMaterial = new THREE.MeshBasicMaterial({
+    const frontLightMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: 0xffffff,
       emissiveIntensity: 0.7,
@@ -242,7 +242,7 @@ export class CybertruckModel implements IVehicleModelBuilder {
     parent.add(frontLight);
 
     // Rear LED light bar (full width)
-    const rearLightMaterial = new THREE.MeshBasicMaterial({
+    const rearLightMaterial = new THREE.MeshStandardMaterial({
       color: 0xff0000,
       emissive: 0xff0000,
       emissiveIntensity: 0.7,

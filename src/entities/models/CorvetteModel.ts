@@ -237,13 +237,13 @@ export class CorvetteModel implements IVehicleModelBuilder {
    * Headlights and taillights
    */
   private buildLights(parent: THREE.Group): void {
-    const headlightMaterial = new THREE.MeshBasicMaterial({
+    const headlightMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffaa,
       emissive: 0xffffaa,
       emissiveIntensity: 0.5,
     });
 
-    const taillightMaterial = new THREE.MeshBasicMaterial({
+    const taillightMaterial = new THREE.MeshStandardMaterial({
       color: 0xff0000,
       emissive: 0xff0000,
       emissiveIntensity: 0.5,

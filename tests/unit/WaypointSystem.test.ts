@@ -517,11 +517,20 @@ describe('WaypointSystem', () => {
       expect(nextPos.z).toBe(100); // Now pointing to waypoint 1
     });
 
-    it('should return clone of position (not reference)', () => {
+    it('should return temp vector reference (caller must copy if persistence needed)', () => {
       const pos1 = waypointSystem.getNextWaypointPosition();
       const pos2 = waypointSystem.getNextWaypointPosition();
 
-      expect(pos1).not.toBe(pos2);
+      // Both return same reference to temp vector (zero-alloc optimization)
+      expect(pos1).toBe(pos2);
+
+      // If caller needs persistent copy, they should copy it
+      const pos1Copy = pos1.clone();
+      waypointSystem.update(new THREE.Vector3(0, 0, 0)); // Move to next waypoint
+      const pos2Value = waypointSystem.getNextWaypointPosition();
+
+      // Original copy should be unchanged, but referenced temp vector will change
+      expect(pos1Copy).not.toEqual(pos2Value);
     });
 
     it('should handle wrap-around at lap boundary', () => {

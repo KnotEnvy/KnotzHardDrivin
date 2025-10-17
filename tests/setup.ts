@@ -216,6 +216,8 @@ class MockRapierWorld {
         desc._gravityScale = scale;
       }),
       gravityScale: vi.fn(() => desc._gravityScale || 1.0),
+      isFixed: vi.fn(() => desc._type === 'fixed'),
+      isDynamic: vi.fn(() => desc._type === 'dynamic'),
     };
     this.bodies.set(id, body);
     return body;
@@ -235,6 +237,10 @@ class MockRapierWorld {
       }),
       setRestitution: vi.fn((r: number) => {
         desc._restitution = r;
+      }),
+      isSensor: vi.fn(() => desc._isSensor || false),
+      setSensor: vi.fn((sensor: boolean) => {
+        desc._isSensor = sensor;
       }),
     };
     this.colliders.set(id, collider);
