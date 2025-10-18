@@ -3,6 +3,7 @@ import { Vehicle } from '../entities/Vehicle';
 import { Track } from '../entities/Track';
 import { GameState } from '../core/GameEngine';
 import { DamageSeverity } from '../types/VehicleTypes';
+import { TimerSystem } from './TimerSystem';
 
 /**
  * Crash severity classification based on impact force.
@@ -533,18 +534,23 @@ export class CrashManager {
 
     // Map severity to damage amount
     let damageAmount = 0;
+    let penaltySeconds = 0; // Phase 5A: Timer penalty
     switch (crashEvent.severity) {
       case CrashSeverity.MINOR:
         damageAmount = normalizedForce * 0.05; // 5% max per minor crash
+        penaltySeconds = 5; // -5 seconds for minor crash (Phase 5A)
         break;
       case CrashSeverity.MAJOR:
         damageAmount = normalizedForce * 0.15; // 15% max per major crash
+        penaltySeconds = 10; // -10 seconds for major crash (Phase 5A)
         break;
       case CrashSeverity.CATASTROPHIC:
         damageAmount = normalizedForce * 0.30; // 30% max per catastrophic
+        penaltySeconds = 15; // -15 seconds for catastrophic crash (Phase 5A)
         break;
       case CrashSeverity.NONE:
         damageAmount = 0;
+        penaltySeconds = 0;
         break;
     }
 
@@ -584,6 +590,12 @@ export class CrashManager {
     // Limit collision history (keep last 10)
     if (damageState.recentCollisions.length > 10) {
       damageState.recentCollisions = damageState.recentCollisions.slice(-10);
+    }
+
+    // Apply timer penalty (Phase 5A)
+    if (penaltySeconds > 0) {
+      const timerSystem = TimerSystem.getInstance();
+      timerSystem.applyPenalty(penaltySeconds);
     }
   }
 

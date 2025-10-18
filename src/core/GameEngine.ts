@@ -5,6 +5,9 @@ import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 import { Vehicle } from '../entities/Vehicle';
 import { InputSystem } from '../systems/InputSystem';
 import { CameraSystem } from '../systems/CameraSystem';
+import { TimerSystem, TimerEvent } from '../systems/TimerSystem';
+import { LeaderboardSystem } from '../systems/LeaderboardSystem';
+import { StatisticsSystem } from '../systems/StatisticsSystem';
 import { DEFAULT_VEHICLE_CONFIG } from '../config/PhysicsConfig';
 import { Track, TrackData } from '../entities/Track';
 import { WaypointSystem, WaypointData } from '../systems/WaypointSystem';
@@ -50,6 +53,13 @@ export class GameEngine {
   private replayRecorder: ReplayRecorder | null = null;
   private replayPlayer: ReplayPlayer | null = null;
 
+  // Phase 5A: Timer System
+  private timerSystem: TimerSystem;
+
+  // Phase 5B: Leaderboard and Statistics
+  private leaderboardSystem: LeaderboardSystem;
+  private statisticsSystem: StatisticsSystem;
+
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
   private running = false;
@@ -75,6 +85,14 @@ export class GameEngine {
     this.stateManager = new StateManager();
     this.performanceMonitor = new PerformanceMonitor();
     this.cameraSystem = new CameraSystem(this.sceneManager.camera);
+    this.timerSystem = TimerSystem.getInstance();
+    this.leaderboardSystem = LeaderboardSystem.getInstance();
+    this.statisticsSystem = StatisticsSystem.getInstance();
+
+    // Subscribe to timer events
+    this.timerSystem.subscribe((event: TimerEvent, data?: any) => {
+      this.handleTimerEvent(event, data);
+    });
 
     // Handle window resize
     window.addEventListener('resize', this.handleResize);
@@ -251,7 +269,7 @@ export class GameEngine {
           this.replayRecorder.recordFrame(this.vehicle, this.sceneManager.camera, deltaTime);
         }
 
-        // Update waypoint system
+        // Update waypoint system (BEFORE timer system)
         if (this.waypointSystem && this.vehicle) {
           const transform = this.vehicle.getTransform();
           const vehiclePos = transform.position;
@@ -263,11 +281,15 @@ export class GameEngine {
             console.log(`Waypoint ${waypointResult.waypointId} passed`);
             if (waypointResult.timeBonus) {
               console.log(`Time bonus: +${waypointResult.timeBonus}s`);
+              // Integrate with Timer System (Phase 5A)
+              this.timerSystem.onCheckpointPassed(waypointResult.timeBonus);
             }
           }
 
           if (waypointResult.lapCompleted) {
             console.log(`Lap ${waypointResult.currentLap} completed! Progress: ${(this.waypointSystem.getProgress() * 100).toFixed(1)}%`);
+            // Integrate with Timer System (Phase 5A)
+            this.timerSystem.onLapCompleted();
           }
 
           if (waypointResult.raceFinished) {
@@ -280,6 +302,18 @@ export class GameEngine {
             // TODO: Show wrong-way indicator UI (Phase 7)
           }
         }
+
+        // Update timer system (Phase 5A) - AFTER waypoint system
+        this.timerSystem.update(deltaTime);
+
+        // Update statistics system (Phase 5B)
+        if (this.vehicle) {
+          const transform = this.vehicle.getTransform();
+          const speed = transform.linearVelocity.length();
+          this.statisticsSystem.recordSpeed(speed);
+        }
+        this.statisticsSystem.recordPlayTime(deltaTime);
+
         break;
       case GameState.PAUSED:
         // Minimal updates when paused
@@ -383,6 +417,35 @@ export class GameEngine {
   }
 
   /**
+   * Handles timer system events and coordinates state transitions
+   * @param event - TimerEvent type
+   * @param data - Optional event data
+   */
+  private handleTimerEvent(event: TimerEvent, data?: any): void {
+    switch (event) {
+      case TimerEvent.TIME_EXPIRED:
+        // Transition to results when time runs out
+        console.log('Time expired! Transitioning to results screen.');
+        this.setState(GameState.RESULTS);
+        break;
+      case TimerEvent.CHECKPOINT_BONUS:
+        console.log(`Checkpoint bonus: +${data?.timeBonus}s`);
+        break;
+      case TimerEvent.LAP_COMPLETE:
+        console.log(`Lap complete: ${this.timerSystem.formatTime(data?.lapTime)}`);
+        break;
+      case TimerEvent.PENALTY_APPLIED:
+        console.log(`Penalty applied: -${data?.penaltySeconds}s`);
+        break;
+      case TimerEvent.RACE_STARTED:
+      case TimerEvent.RACE_PAUSED:
+      case TimerEvent.RACE_RESUMED:
+        // These are logged but don't require state changes
+        break;
+    }
+  }
+
+  /**
    * Transitions to a new game state with validation.
    * @param newState - The state to transition to
    * @throws Error if transition is invalid
@@ -439,6 +502,13 @@ export class GameEngine {
         // Start race timer, enable input
         this.accumulator = 0; // Reset accumulator
 
+        // Start or resume timer (Phase 5A)
+        if (this.timerSystem.isPaused()) {
+          this.timerSystem.resume();
+        } else {
+          this.timerSystem.start();
+        }
+
         // Initialize track and vehicle asynchronously
         this.initializeRace().catch(error => {
           console.error('Failed to initialize race:', error);
@@ -446,6 +516,8 @@ export class GameEngine {
         break;
       case GameState.PAUSED:
         // Show pause menu
+        // Pause timer (Phase 5A)
+        this.timerSystem.pause();
         break;
       case GameState.CRASHED:
         // Trigger crash effects
@@ -473,7 +545,9 @@ export class GameEngine {
         // Cleanup menu
         break;
       case GameState.PLAYING:
-        // Pause timers
+        // Stop and reset timer (Phase 5A)
+        this.timerSystem.stop();
+
         // Clean up Phase 4 systems (Crash & Replay)
         if (this.crashManager) {
           this.crashManager.dispose();
@@ -647,6 +721,29 @@ export class GameEngine {
    */
   getReplayPlayer(): ReplayPlayer | null {
     return this.replayPlayer;
+  }
+
+  /**
+   * Gets the timer system instance (Phase 5A).
+   */
+  getTimerSystem(): TimerSystem {
+    return this.timerSystem;
+  }
+
+  /**
+   * Gets the LeaderboardSystem singleton instance
+   * @returns The LeaderboardSystem
+   */
+  getLeaderboardSystem(): LeaderboardSystem {
+    return this.leaderboardSystem;
+  }
+
+  /**
+   * Gets the StatisticsSystem singleton instance
+   * @returns The StatisticsSystem
+   */
+  getStatisticsSystem(): StatisticsSystem {
+    return this.statisticsSystem;
   }
 
   /**
