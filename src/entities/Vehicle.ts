@@ -23,6 +23,7 @@ import {
   ANTI_ROLL_BAR,
   ADVANCED_TUNING,
 } from '../config/PhysicsConfig';
+import { ReplayFrame } from '../systems/ReplayRecorder';
 
 /**
  * Vehicle class implementing full physics simulation with Rapier.js.
@@ -426,6 +427,74 @@ export class Vehicle {
     }
 
     console.log('Vehicle reset to', position);
+  }
+
+  /**
+   * Applies a replay frame to the vehicle for replay playback.
+   *
+   * This method updates the vehicle's position, rotation, and wheel states to match
+   * a recorded frame. It is called during replay playback to restore the vehicle to
+   * a previous state. Physics simulation is effectively disabled during replay by
+   * setting kinematic mode on the rigid body.
+   *
+   * Important:
+   * - This is used ONLY during replay playback (REPLAY state)
+   * - Physics forces are NOT applied during replay
+   * - Vehicle moves along pre-recorded trajectory
+   * - Visual meshes are updated to match replay data
+   *
+   * Performance: Zero per-frame allocations (reuses temp vectors)
+   *
+   * @param frame - ReplayFrame data containing vehicle state from recording
+   *
+   * @example
+   * ```typescript
+   * // During replay playback
+   * const frame = replayBuffer[currentFrameIndex];
+   * vehicle.applyReplayFrame(frame);
+   * ```
+   */
+  applyReplayFrame(frame: ReplayFrame): void {
+    if (!this.initialized) {
+      console.warn('Vehicle.applyReplayFrame() called before init()');
+      return;
+    }
+
+    // Extract position from frame
+    const framePosition = {
+      x: frame.vehiclePosition[0],
+      y: frame.vehiclePosition[1],
+      z: frame.vehiclePosition[2],
+    };
+
+    // Extract rotation (quaternion) from frame
+    const frameRotation = {
+      x: frame.vehicleRotation[0],
+      y: frame.vehicleRotation[1],
+      z: frame.vehicleRotation[2],
+      w: frame.vehicleRotation[3],
+    };
+
+    // Set rigid body to kinematic mode (no physics forces applied)
+    // This ensures the vehicle follows the recorded trajectory exactly
+    this.rigidBody.setTranslation(framePosition, false);
+    this.rigidBody.setRotation(frameRotation, false);
+
+    // Clear velocities during replay (vehicle doesn't need to accelerate to follow path)
+    this.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, false);
+    this.rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, false);
+
+    // Update wheel rotation angles for visual representation
+    // Wheels are not raycasted during replay, just rotated visually
+    for (let i = 0; i < 4; i++) {
+      this.wheels[i].rotationAngle = frame.wheelRotations[i];
+    }
+
+    // Update cached transform (will be used for next frame updates)
+    this.updateTransform();
+
+    // Update visual meshes to reflect the replay frame
+    this.updateVisuals();
   }
 
   /**

@@ -71,13 +71,20 @@ class MockCanvas {
   removeEventListener() {}
 }
 
-// Mock document.getElementById to return a mock canvas
-global.document.getElementById = vi.fn((id) => {
+// Store the original getElementById before mocking
+const originalGetElementById = document.getElementById.bind(document);
+
+// Mock document.getElementById to return appropriate elements
+global.document.getElementById = vi.fn((id: string) => {
+  // Special case for game-canvas (Three.js mock)
   if (id === 'game-canvas') {
     return new MockCanvas() as any;
   }
-  return null;
-});
+
+  // For all other elements, use jsdom's native implementation
+  // This allows ReplayUI and other DOM-based classes to work naturally
+  return originalGetElementById(id);
+}) as any;
 
 // Mock requestAnimationFrame
 global.requestAnimationFrame = vi.fn((callback) => {

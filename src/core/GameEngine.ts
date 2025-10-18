@@ -303,10 +303,7 @@ export class GameEngine {
 
           if (interpolatedFrame) {
             // Apply interpolated frame to vehicle (kinematic mode)
-            // Note: Requires Vehicle.applyReplayFrame() implementation (Phase 4 task)
-            if (typeof (this.vehicle as any).applyReplayFrame === 'function') {
-              (this.vehicle as any).applyReplayFrame(interpolatedFrame);
-            }
+            this.vehicle.applyReplayFrame(interpolatedFrame);
           } else {
             // Replay finished - respawn vehicle and return to playing
             if (this.crashManager) {
@@ -373,11 +370,15 @@ export class GameEngine {
       const transform = this.vehicle.getTransform();
       this.cameraSystem.update(0.016, {
         position: transform.position,
-        quaternion: transform.rotation, // FIX: VehicleTransform has 'rotation', not 'quaternion'
+        quaternion: transform.rotation,
         velocity: transform.linearVelocity,
       });
     }
 
+    // CRITICAL FIX: Update environment system (clouds, scenery) before rendering
+    this.sceneManager.update(0.016);
+
+    // Render the scene
     this.sceneManager.render();
   }
 
