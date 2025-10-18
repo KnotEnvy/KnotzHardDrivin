@@ -386,16 +386,18 @@ describe('ReplayPlayer', () => {
       expect(player.getPlaybackTime()).toBeCloseTo(0, 1);
     });
 
-    it('should increase as playback progresses', (done) => {
-      player.startPlayback();
-      const initialTime = player.getPlaybackTime();
+    it('should increase as playback progresses', () => {
+      return new Promise<void>((resolve) => {
+        player.startPlayback();
+        const initialTime = player.getPlaybackTime();
 
-      setTimeout(() => {
-        player.update(0.016);
-        const newTime = player.getPlaybackTime();
-        expect(newTime).toBeGreaterThanOrEqual(initialTime);
-        done();
-      }, 50);
+        setTimeout(() => {
+          player.update(0.016);
+          const newTime = player.getPlaybackTime();
+          expect(newTime).toBeGreaterThanOrEqual(initialTime);
+          resolve();
+        }, 50);
+      });
     });
   });
 

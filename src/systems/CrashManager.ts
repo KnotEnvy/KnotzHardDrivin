@@ -199,6 +199,18 @@ export class CrashManager {
    */
   private enabled = false;
 
+  /**
+   * Grace period after initialization (seconds).
+   * Crash detection is disabled for this duration to allow physics to settle.
+   */
+  private readonly GRACE_PERIOD = 0.5; // 500ms / ~30 frames
+
+  /**
+   * Time when crash detection was initialized.
+   * Used to enforce grace period.
+   */
+  private initTime = 0;
+
   constructor() {
     // Initialize velocity tracking
     this.previousVelocity.set(0, 0, 0);
@@ -230,6 +242,12 @@ export class CrashManager {
     this.stateTransitionCallback = stateTransitionCallback;
     this.enabled = true;
     this.lastReplayTriggerTime = -this.CRASH_REPLAY_COOLDOWN;
+    this.initTime = 0; // Will be set on first update() call
+
+    // Initialize previousVelocity with vehicle's current velocity
+    // This prevents false crash detection on first frame
+    const transform = vehicle.getTransform();
+    this.previousVelocity.copy(transform.linearVelocity);
 
     console.log('CrashManager initialized');
   }
@@ -259,6 +277,11 @@ export class CrashManager {
 
     this.currentTime = gameTime;
 
+    // Set init time on first update (for grace period)
+    if (this.initTime === 0) {
+      this.initTime = gameTime;
+    }
+
     // Check for crashes based on velocity changes
     this.detectCollisionImpact();
 
@@ -283,6 +306,13 @@ export class CrashManager {
    */
   private detectCollisionImpact(): void {
     if (!this.vehicle) {
+      return;
+    }
+
+    // Grace period: skip crash detection immediately after spawn
+    // Allows physics to settle (vehicle falling to ground, etc.)
+    const timeSinceInit = this.currentTime - this.initTime;
+    if (timeSinceInit < this.GRACE_PERIOD) {
       return;
     }
 
@@ -359,6 +389,12 @@ export class CrashManager {
    */
   private detectHardLanding(): void {
     if (!this.vehicle) {
+      return;
+    }
+
+    // Grace period: skip crash detection immediately after spawn
+    const timeSinceInit = this.currentTime - this.initTime;
+    if (timeSinceInit < this.GRACE_PERIOD) {
       return;
     }
 

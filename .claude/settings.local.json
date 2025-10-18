@@ -16,7 +16,19 @@
       "Bash(npx playwright test:*)",
       "Bash(npx playwright:*)",
       "Bash(awk:*)",
-      "Read(//d/**)"
+      "Read(//d/**)",
+      "Bash(git checkout:*)",
+      "Bash(curl:*)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__take_screenshot",
+      "Read(//tmp/chrome-devtools-mcp-kzrenW/**)",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__wait_for",
+      "Read(//tmp/chrome-devtools-mcp-6dbX6B/**)",
+      "Bash(cd:*)",
+      "Bash(timeout 180 npm test)",
+      "Bash(timeout 120 npm test -- tests/unit/ReplayUI.test.ts --run)"
     ],
     "deny": [],
     "ask": []
