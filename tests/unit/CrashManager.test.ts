@@ -88,13 +88,14 @@ describe('CrashManager', () => {
       crashManager.onCrash(crashListener);
 
       // Simulate 2 frames: first at 20 m/s, then sudden stop
+      // First call at t=0 (init), second at t=0.51 (past grace period)
       crashManager.update(0.01667, 0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0), // Sudden stop = crash
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period (0.5s)
 
       expect(crashListener).toHaveBeenCalled();
     });
@@ -110,7 +111,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0), // Change from 20 m/s
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       // Should have called listener and detected some severity
       expect(crashListener).toHaveBeenCalled();
@@ -130,7 +131,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0), // Complete stop from 20 m/s
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       expect(crashListener).toHaveBeenCalled();
       const event = crashListener.mock.calls[0]?.[0] as CrashEvent;
@@ -146,7 +147,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       // Verify damage state was accessed (indicating damage update)
       expect(mockVehicle.getDamageState).toHaveBeenCalled();
@@ -156,46 +157,46 @@ describe('CrashManager', () => {
       const replayListener = vi.fn();
       crashManager.onReplayTrigger(replayListener);
 
-      // First crash at t=0
+      // First crash at t=0.51 (past grace period)
       crashManager.update(0.01667, 0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51);
 
       const firstCallCount = replayListener.mock.calls.length;
 
-      // Second crash at t=0.5s (within cooldown)
+      // Second crash at t=1.0s (within 2-second cooldown from first crash at t=0.51)
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 20),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.5);
+      crashManager.update(0.01667, 1.0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.51667);
+      crashManager.update(0.01667, 1.01667);
 
       expect(replayListener.mock.calls.length).toBe(firstCallCount);
 
-      // Third crash at t=2.5s (after cooldown)
+      // Third crash at t=3.0s (after 2-second cooldown)
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 20),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 2.5);
+      crashManager.update(0.01667, 3.0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 2.51667);
+      crashManager.update(0.01667, 3.01667);
 
       expect(replayListener.mock.calls.length).toBeGreaterThan(firstCallCount);
     });
@@ -221,7 +222,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       expect(crashListener).toHaveBeenCalled();
       const event = crashListener.mock.calls[0]?.[0] as CrashEvent;
@@ -240,7 +241,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       expect(replayListener).toHaveBeenCalled();
       const event = replayListener.mock.calls[0]?.[0] as CrashEvent;
@@ -260,7 +261,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       expect(listener1).toHaveBeenCalled();
       expect(listener2).toHaveBeenCalled();
@@ -328,7 +329,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.01667);
+      crashManager.update(0.01667, 0.51); // Past grace period
 
       expect(stateCallback).toHaveBeenCalledWith(GameState.CRASHED);
     });

@@ -28,7 +28,13 @@
       "Read(//tmp/chrome-devtools-mcp-6dbX6B/**)",
       "Bash(cd:*)",
       "Bash(timeout 180 npm test)",
-      "Bash(timeout 120 npm test -- tests/unit/ReplayUI.test.ts --run)"
+      "Bash(timeout 120 npm test -- tests/unit/ReplayUI.test.ts --run)",
+      "Bash(npx vitest run tests/unit/AudioSystem.test.ts)",
+      "Bash(echo \"3. Complete unit test coverage (77 tests, >87%)\")",
+      "Bash(echo \"- <1ms per frame performance\")",
+      "Bash(timeout 120 npm test)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__click"
     ],
     "deny": [],
     "ask": []

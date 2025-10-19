@@ -1,8 +1,65 @@
-.node
-.env
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite
+dist/
+/.vite/
+
+# Build output
+build/
+coverage/
+coverage-temp.json
+coverage-final.json
+lcov.info
+
+# Test output
+test-results/
+playwright-report/
+tests/
+
+
+
+# Logs
+*.log
+
+# OS generated files
 .DS_Store
-coverage
-.vscode
-node_modules
-dist
-.env.local
+Thumbs.db
+
+# IDEs and editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.env
+.env.*
+
+# Ignore docs coverage output
+__DOCS__/coverage/
+__DOCS__/lcov-report/
+
+# Ignore asset build output
+public/assets/
+
+# Ignore temp files
+*.tmp
+*.temp
+
+# Ignore by convention
+*.bak
+*.old
+
+# Ignore local config
+src/config/local.js

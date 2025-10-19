@@ -14,6 +14,11 @@ import { WaypointSystem, WaypointData } from '../systems/WaypointSystem';
 import { CrashManager, CrashEvent } from '../systems/CrashManager';
 import { ReplayRecorder } from '../systems/ReplayRecorder';
 import { ReplayPlayer } from '../systems/ReplayPlayer';
+import { GhostRecorder } from '../systems/GhostRecorder';
+import { GhostManager } from '../systems/GhostManager';
+import { AudioSystem } from '../systems/AudioSystem';
+import { EngineSoundManager } from '../systems/EngineSoundManager';
+import { UISystem, UIPanel } from '../systems/UISystem';
 import * as THREE from 'three';
 
 /**
@@ -59,6 +64,17 @@ export class GameEngine {
   // Phase 5B: Leaderboard and Statistics
   private leaderboardSystem: LeaderboardSystem;
   private statisticsSystem: StatisticsSystem;
+
+  // Phase 6: Ghost AI System
+  private ghostRecorder: GhostRecorder | null = null;
+  private ghostManager: GhostManager | null = null;
+
+  // Phase 7A: UI System
+  private uiSystem: UISystem | null = null;
+
+  // Phase 7B: Audio System
+  private audioSystem: AudioSystem | null = null;
+  private engineSoundManager: EngineSoundManager | null = null;
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
@@ -107,11 +123,30 @@ export class GameEngine {
   async start(): Promise<void> {
     try {
       await this.physicsWorld.init();
+
+      // Phase 7B: Initialize Audio System
+      this.audioSystem = AudioSystem.getInstance();
+      await this.audioSystem.init();
+      this.engineSoundManager = new EngineSoundManager(this.audioSystem);
+      await this.engineSoundManager.init();
+      console.log('✅ Audio system initialized');
+
+      // Phase 7A: Initialize UI System
+      this.uiSystem = UISystem.getInstance();
+      this.uiSystem.init();
+      this.setupUIEventHandlers();
+      console.log('✅ UI system initialized');
+
       this.running = true;
       this.lastTime = performance.now();
 
       // Transition from LOADING to MENU
       this.setState(GameState.MENU);
+
+      // Show main menu
+      if (this.uiSystem) {
+        this.uiSystem.showPanel(UIPanel.MAIN_MENU);
+      }
 
       this.gameLoop();
     } catch (error) {
@@ -145,6 +180,13 @@ export class GameEngine {
         // Update vehicle physics (60Hz fixed timestep)
         if (this.vehicle && this.inputSystem && this.state === GameState.PLAYING) {
           const input = this.inputSystem.getInput();
+
+          // Handle pause input
+          if (input.pause) {
+            this.setState(GameState.PAUSED);
+            this.uiSystem?.showPanel(UIPanel.PAUSE_MENU);
+          }
+
           // Convert InputSystem's VehicleInput (handbrake: boolean) to Vehicle's expected format (handbrake: number)
           this.vehicle.setInput({
             ...input,
@@ -267,6 +309,41 @@ export class GameEngine {
         // Record frame for replay (Phase 4)
         if (this.replayRecorder && this.vehicle) {
           this.replayRecorder.recordFrame(this.vehicle, this.sceneManager.camera, deltaTime);
+        }
+
+        // Update Ghost AI (Phase 6)
+        if (this.ghostRecorder && this.vehicle) {
+          this.ghostRecorder.recordFrame(this.vehicle);
+        }
+        if (this.ghostManager) {
+          this.ghostManager.update(deltaTime);
+        }
+
+        // Update Engine Sound (Phase 7B)
+        if (this.engineSoundManager && this.vehicle) {
+          const telemetry = this.vehicle.getTelemetry();
+          const input = this.inputSystem?.getInput();
+          this.engineSoundManager.updateRPM(
+            telemetry.rpm, // Fixed: rpm not engineRPM
+            7000, // Max RPM
+            input?.throttle || 0
+          );
+        }
+
+        // Update HUD (Phase 7A)
+        if (this.uiSystem && this.vehicle && this.state === GameState.PLAYING) {
+          const telemetry = this.vehicle.getTelemetry();
+          const damageState = this.vehicle.getDamageState();
+          const maxLaps = this.waypointSystem?.getMaxLaps() || 3;
+
+          this.uiSystem.updateHUD({
+            speed: telemetry.speedMph,
+            lapTime: this.timerSystem.getFormattedRaceTime(),
+            currentLap: this.timerSystem.getCurrentLap(),
+            maxLaps,
+            position: 1, // TODO: Get from race position system
+            damage: damageState.overallDamage,
+          });
         }
 
         // Update waypoint system (BEFORE timer system)
@@ -647,6 +724,83 @@ export class GameEngine {
   };
 
   /**
+   * Sets up UI event handlers for buttons and interactions
+   */
+  private setupUIEventHandlers(): void {
+    if (!this.uiSystem) return;
+
+    // Main Menu - Start button
+    this.uiSystem.onButtonClick('btn-start', async () => {
+      console.log('Start button clicked');
+      await this.initializeRace();
+      this.setState(GameState.PLAYING);
+      this.uiSystem?.showPanel(UIPanel.HUD);
+    });
+
+    // Keyboard shortcut: SPACE to start from menu
+    window.addEventListener('keydown', async (e) => {
+      if (e.code === 'Space' && this.state === GameState.MENU) {
+        e.preventDefault();
+        console.log('Space pressed - starting race');
+        await this.initializeRace();
+        this.setState(GameState.PLAYING);
+        this.uiSystem?.showPanel(UIPanel.HUD);
+      }
+    });
+
+    // Main Menu - Leaderboard button
+    this.uiSystem.onButtonClick('btn-leaderboard', () => {
+      console.log('Leaderboard button clicked');
+      // TODO: Show leaderboard panel
+    });
+
+    // Main Menu - Settings button
+    this.uiSystem.onButtonClick('btn-settings', () => {
+      console.log('Settings button clicked');
+      // TODO: Show settings panel
+    });
+
+    // Pause Menu - Resume button
+    this.uiSystem.onButtonClick('btn-resume', () => {
+      console.log('Resume button clicked');
+      this.setState(GameState.PLAYING);
+      this.uiSystem?.showPanel(UIPanel.HUD);
+    });
+
+    // Pause Menu - Restart button
+    this.uiSystem.onButtonClick('btn-restart', async () => {
+      console.log('Restart button clicked');
+      await this.initializeRace();
+      this.setState(GameState.PLAYING);
+      this.uiSystem?.showPanel(UIPanel.HUD);
+    });
+
+    // Pause Menu - Quit button
+    this.uiSystem.onButtonClick('btn-quit', () => {
+      console.log('Quit button clicked');
+      this.setState(GameState.MENU);
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+    });
+
+    // Results - Race Again button
+    this.uiSystem.onButtonClick('btn-race-again', async () => {
+      console.log('Race again button clicked');
+      await this.initializeRace();
+      this.setState(GameState.PLAYING);
+      this.uiSystem?.showPanel(UIPanel.HUD);
+    });
+
+    // Results - Main Menu button
+    this.uiSystem.onButtonClick('btn-main-menu', () => {
+      console.log('Main menu button clicked');
+      this.setState(GameState.MENU);
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+    });
+
+    console.log('UI event handlers set up');
+  }
+
+  /**
    * Gets the performance monitor for FPS and frame time data.
    */
   getPerformanceMonitor(): PerformanceMonitor {
@@ -866,6 +1020,19 @@ export class GameEngine {
       this.replayRecorder = new ReplayRecorder();
       this.replayRecorder.startRecording();
 
+      // Phase 6: Initialize Ghost AI System
+      this.ghostRecorder = GhostRecorder.getInstance();
+      this.ghostRecorder.startRecording('track01'); // TODO: Use dynamic track ID
+
+      this.ghostManager = GhostManager.getInstance();
+      // Load best lap ghost from leaderboard if available
+      const ghostData = this.leaderboardSystem.getGhostData(1); // Rank 1 = best time
+      if (ghostData) {
+        // Spawn ghost for rank 1
+        this.ghostManager.spawnGhosts(this.sceneManager.scene, [1]);
+        console.log('✅ Loaded ghost for rank 1');
+      }
+
       console.log('✅ Race initialized successfully!');
       console.log(`✅ Vehicle spawned at: (${spawnPoint.position.x.toFixed(2)}, ${spawnPoint.position.y.toFixed(2)}, ${spawnPoint.position.z.toFixed(2)})`);
       console.log(`✅ Track: ${trackData.name}, Waypoints: ${waypoints.length}, Max Laps: ${this.waypointSystem.getMaxLaps()}`);
@@ -887,6 +1054,32 @@ export class GameEngine {
     this.running = false;
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+
+    // Cleanup Phase 7B: Audio systems
+    if (this.engineSoundManager) {
+      this.engineSoundManager.dispose();
+      this.engineSoundManager = null;
+    }
+    if (this.audioSystem) {
+      this.audioSystem.dispose();
+      this.audioSystem = null;
+    }
+
+    // Cleanup Phase 7A: UI system
+    if (this.uiSystem) {
+      this.uiSystem.dispose();
+      this.uiSystem = null;
+    }
+
+    // Cleanup Phase 6: Ghost systems
+    if (this.ghostManager) {
+      this.ghostManager.disposeAllGhosts();
+      // Note: Don't set to null since it's a singleton
+    }
+    if (this.ghostRecorder) {
+      this.ghostRecorder.clear();
+      // Note: Don't set to null since it's a singleton
+    }
 
     // Cleanup Phase 4 systems
     if (this.crashManager) {

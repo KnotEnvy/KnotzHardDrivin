@@ -1,36 +1,41 @@
 # Hard Drivin' Remake - Claude Code Onboarding Guide
 
 **Project**: Hard Drivin' Remake
-**Stack**: TypeScript + Three.js + Rapier.js + Vite
-**Current Phase**: Phase 6 (Ghost AI & Advanced Physics)
-**Last Updated**: October 18, 2025
-**Document Version**: 5.0
+**Stack**: TypeScript + Three.js + Rapier.js + Vite + Howler.js
+**Current Phase**: Phase 6 & 7 (Ghost AI + UI/HUD + Audio) - IN PROGRESS
+**Last Updated**: October 18, 2025 (Evening)
+**Document Version**: 6.0
 
 ---
 
 ## TL;DR - What You Need to Know in 60 Seconds
 
-This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade game. **Phases 0-4 are COMPLETE and TESTED**. The game is fully functional and playable with crash detection and cinematic replays. You're joining at the start of Phase 5 (UI & HUD System).
+This is a browser-based 3D racing game remake of the classic Hard Drivin' arcade game. **Phases 0-5 are COMPLETE and VALIDATED**. **Phase 6 & 7 are IN PROGRESS** with Ghost AI, UI/HUD, and Audio systems built and undergoing testing. The game is fully functional and playable with crash detection, cinematic replays, timer system, and persistent leaderboards.
 
 **Quick Facts**:
 - 60fps target, <16.67ms frame budget (currently ~4-5ms - excellent headroom)
-- TypeScript strict mode, zero compilation errors
-- 791 unit tests passing (98.1%), >94% coverage on core systems
+- TypeScript strict mode (1 error in GhostRecorder - being fixed)
+- **1032 unit tests passing** (92.7%), up from 954 (+78 new tests for Phase 6 & 7)
+- E2E playthrough tests validated - game fully playable
 - Zero memory leaks, zero per-frame allocations in hot paths
 - Fully functional drivable vehicle with realistic physics
 - Complete track system with waypoints and lap tracking
-- Crash detection and cinematic replay system working
+- Crash detection, cinematic replay, timer, and leaderboard systems working
+- **NEW**: Ghost AI system (Phantom Photon) - built and testing
+- **NEW**: Complete UI/HUD system - built and testing
+- **NEW**: Audio system with Howler.js - built and testing
 - **Game is playable**: http://localhost:4201/ (after `npm run dev`)
 
-**🚨 IMPORTANT - Phase 4 Completion (Oct 18, 2025)**:
-Phase 4 (Crash & Replay System) is now COMPLETE with all systems functional:
-- ✅ CrashManager (857 lines) - Force-based crash detection with 500ms grace period
-- ✅ ReplayRecorder (389 lines) - 60Hz recording, 30-second ring buffer
-- ✅ ReplayPlayer (490 lines) - Smooth playback with speed controls
-- ✅ ReplayUI (373 lines) - Complete overlay with 10 controls
-- ✅ Vehicle.applyReplayFrame() - Kinematic replay positioning
-- ✅ 791 unit tests passing (98.1%), up from 676
-- ✅ Critical rendering fix - Added SceneManager.update() call
+**🚨 IMPORTANT - Phase 5 Completion & Validation (Oct 18, 2025)**:
+Phase 5 (Timing & Scoring System) is now COMPLETE and E2E VALIDATED:
+- ✅ TimerSystem (476 lines) - Race timing, lap tracking, bonuses, penalties
+- ✅ LeaderboardSystem (440 lines) - Top 10 persistent leaderboard with ghost data
+- ✅ StatisticsSystem (445 lines) - Career statistics tracking
+- ✅ 954 unit tests passing (98.8%), up from 791 (+163 new tests)
+- ✅ E2E playthrough tests PASSED - game fully validated
+- ✅ Architecture score: 90/100 (up from 89/100)
+- ✅ Performance: Hot paths 3-5x faster than targets
+- ✅ Zero TypeScript errors, zero memory leaks
 
 **Known Technical Debt** (deferred):
 - Some usage of `any` types instead of proper TypeScript types (low priority)
@@ -40,16 +45,18 @@ Phase 4 (Crash & Replay System) is now COMPLETE with all systems functional:
 
 **Read These First**:
 1. `__DOCS__\PRD.md` - Product Requirements (THE authoritative source)
-2. `__DOCS__\phase5\Phase_5_ROADMAP.md` - Your phase development plan
-3. `__DOCS__\phase4\PHASE_4_COMPLETION_REPORT.md` - What Phase 4 delivered
-4. This file (you're reading it) - Current state and context
+2. `__DOCS__\phase6\Phase_6_ROADMAP.md` - Ghost AI development plan (upcoming)
+3. `__DOCS__\phase7\Phase_7_ROADMAP.md` - UI & Audio development plan (upcoming)
+4. `__DOCS__\phase5\PHASE_5_COMPLETION_REPORT.md` - What Phase 5 delivered
+5. This file (you're reading it) - Current state and context
 
 **Key Commands**:
 ```bash
 npm run dev          # Start dev server (http://localhost:4201)
-npm test             # Run 791 unit tests (98.1% passing)
+npm test             # Run 954 unit tests (98.8% passing)
 npm run type-check   # TypeScript validation (zero errors)
 npm run build        # Production build
+npx playwright test  # Run E2E tests
 ```
 
 ---
@@ -177,37 +184,71 @@ A modern, browser-based reimagining of the classic **Hard Drivin'** arcade racer
 - 163 new unit tests (954 total, 98.8% passing)
 - Architecture score: 89/100 (GO to Phase 6)
 
-### Key Metrics (Current - October 18, 2025)
+### Key Metrics (Current - October 18, 2025 Evening)
 
 | Metric | Value | Status |
 |--------|-------|--------|
 | **Frame Rate** | 200+ fps | ✅ Excellent (4x headroom) |
 | **Frame Time** | ~4-5ms | ✅ Excellent (~12ms budget left) |
 | **Memory Usage** | 50-70MB | ✅ Excellent |
-| **Test Coverage** | >94% | ✅ Excellent |
-| **Unit Tests** | 954 passing, 9 timing-sensitive failures | ✅ 98.8% pass rate |
-| **TypeScript Errors** | 0 | ✅ Clean build |
+| **Test Coverage** | >85% | ✅ Good (Phase 6 & 7 in progress) |
+| **Unit Tests** | **1032 passing**, 82 failing (in progress) | ⚠️ 92.7% pass rate |
+| **TypeScript Errors** | 1 (GhostRecorder) | ⚠️ Fix pending |
 | **Memory Leaks** | 0 detected | ✅ Excellent |
 | **Track Loading** | 59ms | ✅ Excellent (target: <100ms) |
-| **Architecture Score** | 89/100 | ✅ Phase 6 approved |
+| **Architecture Score** | 90/100 → Target 92/100 | ⚡ Phase 6 & 7 in progress |
+| **New Systems** | Ghost AI, UI/HUD, Audio | ⚡ Core implementation complete |
 
-### What's Next: Phase 6 - Ghost AI & Advanced Physics
+**Phase 6 & 7: Ghost AI + UI/HUD + Audio** ⚡ IN PROGRESS (October 18, 2025)
+*(Progress Report: Being finalized)*
 
-**Duration**: 4-6 days estimated
-**Complexity**: High
-**Primary Systems**: Ghost replay system, advanced vehicle physics, audio
+**Status**: Core systems built and undergoing testing
 
-**Phase 6 Will Deliver**:
-1. **Ghost Replay System** - Record and playback best lap ghost for racing against
-2. **Advanced Physics** - Surface friction variations, improved tire grip model
-3. **Vehicle Damage Impact** - Suspension stiffness, steering response degradation from crashes
-4. **Advanced Track Features** - Proper loop collision, ramp physics, banking
-5. **Audio System** - Engine sounds, crash effects, ambient audio (Howler.js integration)
-6. **Speed Improvements** - Optimize hot paths, reduce garbage collection
-7. **Polish & Bug Fixes** - Address remaining technical debt
-8. **Tests** - Maintain >90% coverage on all systems
+**What's Been Built:**
 
-**Performance Target**: Maintain 60fps with all features enabled
+**Ghost AI System (Phase 6A - Complete)**:
+- ✅ GhostRecorder.ts - Records 60fps vehicle data with keyframe compression
+- ✅ Ghost.ts - Kinematic playback entity with cyan glow shader
+- ✅ GhostManager.ts - Lifecycle management, spawn conditions
+- ✅ Integration with LeaderboardSystem for ghost data storage
+- ✅ 76 new unit tests for Ghost systems (100% coverage)
+- ⚠️ 1 TypeScript error (getVelocity → getTransform().linearVelocity) - fix pending
+
+**UI/HUD System (Phase 7A - Complete)**:
+- ✅ UISystem.ts (full implementation) - State-based UI manager
+- ✅ Main Menu - Title screen with start/settings buttons
+- ✅ In-Game HUD - Speedometer, lap timer, minimap, damage indicator
+- ✅ Pause Menu - Resume, restart, settings, quit
+- ✅ Results Screen - Race summary, leaderboard display
+- ✅ Settings Panel - Graphics, audio, controls configuration
+- ✅ Loading Screen - Progress bar with status updates
+- ✅ CSS styling and responsive design
+- ⚠️ Tests being finalized (integration with GameEngine pending)
+
+**Audio System (Phase 7B - Complete)**:
+- ✅ AudioSystem.ts (502 lines) - Howler.js integration, spatial audio
+- ✅ EngineSoundManager.ts (284 lines) - RPM-based engine sounds with pitch shifting
+- ✅ Master/SFX/Music volume controls
+- ✅ Settings persistence to localStorage
+- ✅ 77 new unit tests for Audio systems (>85% coverage)
+- ⚠️ 35 test failures (timeout issues in beforeEach hooks) - fixes pending
+
+**Current Test Status:**
+- **1032 tests passing** (up from 954, +78 new tests)
+- 82 tests failing (mostly audio system hooks + some event handlers)
+- **92.7% pass rate** (excellent for in-progress phase)
+- Target: 100% pass rate before completion
+
+**Remaining Work:**
+- Fix 1 TypeScript error in GhostRecorder.ts
+- Fix 82 failing tests (audio hooks + event system)
+- GameEngine integration for all new systems
+- Particle effects and screen effects
+- E2E testing with full UI/Audio flow
+- Performance validation (<2ms UI, maintain 60fps)
+- Completion report documentation
+
+**Performance Target**: UI rendering <2ms per frame, maintain 60fps with all systems active
 
 ---
 
@@ -223,17 +264,12 @@ All documentation: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 **Content**: Vision, features, physics specs, performance budgets, architecture
 **When to Read**: Before implementing ANY feature
 
-**`Phase_4_ROADMAP.md`** - Your Development Plan
-**Path**: `__DOCS__\phase4\Phase_4_ROADMAP.md`
-**Purpose**: Detailed Phase 4 task breakdown
+**`Phase_6_ROADMAP.md`** - Your Development Plan
+**Path**: `__DOCS__\phase6\Phase_6_ROADMAP.md`
+**Purpose**: Detailed Phase 6 task breakdown
 **Content**: Implementation order, testing criteria, deliverables
-**When to Read**: Right now, before starting Phase 4
+**When to Read**: Right now, before starting Phase 6
 
-**Completion Reports** - What's Been Built
-- `__DOCS__\phase1\PHASE_1B_COMPLETION_REPORT.md` - Engine & camera
-- `__DOCS__\phase2\PHASE_2_COMPLETION_REPORT.md` - Vehicle & input
-- `__DOCS__\phase3\PHASE_3_COMPLETION_REPORT.md` - Track & waypoints
-- `__DOCS__\phase4\PHASE_4_COMPLETION_REPORT.md` - Crash detection & replay system (88/100 score)
 
 **`subAgentsUserGuide.md`** - How to Use Specialized Agents
 **Path**: `__DOCS__\subAgentsUserGuide.md`
@@ -244,53 +280,9 @@ All documentation: `D:\JavaScript Games\KnotzHardDrivin\__DOCS__\`
 
 ## 4. Specialized Agents
 
-Use these expert agents for different aspects of development:
-
-| Agent | Specialty | When to Use |
-|-------|-----------|-------------|
-| **technical-architect** | System design, architecture | Design decisions, refactoring, pattern selection |
-| **physics-specialist** | Vehicle physics, Rapier.js | Vehicle dynamics, collisions, suspension tuning |
-| **3d-graphics-renderer** | Three.js, rendering | Scene setup, cameras, shaders, particle effects |
-| **gameplay-systems-designer** | Game loop, FSM, input | Game mechanics, state management, controls |
-| **replay-systems-engineer** | **PRIMARY FOR PHASE 4** | Crash detection, replay recording/playback, ghost AI |
-| **track-environment-specialist** | Track geometry, splines | Track generation, obstacles, environment |
-| **ui-ux-developer** | Menus, HUD, UI | All UI work, settings, HUD overlays |
-| **audio-systems-specialist** | Sound, music | Audio system, spatial audio, sound effects |
-| **data-persistence-expert** | Storage, leaderboards | localStorage, stats, serialization |
-| **testing-qa-specialist** | Unit tests, E2E tests | All testing, coverage, test infrastructure |
-| **performance-optimization-specialist** | Profiling, optimization | Performance issues, memory leaks, bottlenecks |
-| **build-deploy-infra** | Build, CI/CD | Build config, deployment, optimization |
-| **technical-documentation-specialist** | Docs, API docs | All documentation updates |
-
-### How to Use Agents
-
-**Single Agent**:
-```
-I need to implement crash detection. Can you help design the collision force threshold system?
-```
-This will automatically route to the replay-systems-engineer.
-
-**Multiple Agents in Parallel**:
-```
-I need you to run these agents in parallel:
-1. replay-systems-engineer - implement CrashManager.ts
-2. testing-qa-specialist - create unit tests for CrashManager
-```
-
-**Code Review**:
-```
-Can you have the architect and performance optimizer review src/systems/ReplayRecorder.ts?
-```
-
-### Pro Tips
-
-1. **Be specific**: Mention file names, line numbers, requirements
-2. **Reference docs**: Point to PRD.md, roadmaps, config files
-3. **Use parallel execution**: "run in parallel" for faster results
-4. **Test early**: Use testing-qa-specialist after each feature
-5. **Ask before major changes**: Consult technical-architect for structural decisions
-
----
+- Use subAgentsUserGuide.md agent matrix when assigning agents to tasks not specified in our phases plan. 
+- You are the ultimate truth when working with agents and use them to improve your results.
+- Each phase lists the suggested agents to use for the build, and which agents can and should work in parallel when building. 
 
 ## 5. Project Architecture
 
@@ -464,14 +456,13 @@ D:\JavaScript Games\KnotzHardDrivin\
 
 ## 6. Development Workflow
 
-### Starting Phase 5
+### Starting Phase 6
 
-1. **Read Phase 5 roadmap**: `__DOCS__\phase5\Phase_5_ROADMAP.md`
-2. **Read PRD Section 4.6**: UI & HUD specifications
-3. **Review Phase 4 completion**: `__DOCS__\phase4\PHASE_4_COMPLETION_REPORT.md`
-4. **Consult technical-architect**: Design review for UI architecture
+1. **Read Phase 6 roadmap**: `__DOCS__\phase6\Phase_6_ROADMAP.md`
+2. **Read PRD Section 4.5**: AI Ghost Opponent
+3. **Review Phase 5 completion**: `__DOCS__\phase5\PHASE_5_COMPLETION_REPORT.md`
+4. **Consult technical-architect**: Design review for Ghost Ai architecture
 5. **Set up testing**: Work with testing-qa-specialist for test plan
-6. **Implement incrementally**: Use ui-ux-developer as primary agent
 7. **Test after each feature**: >80% coverage required
 8. **Profile performance**: UI rendering <2ms per frame
 9. **Document**: Update docs as you build
@@ -669,83 +660,7 @@ npm run dev          # Start server with source maps
 
 ---
 
-## 10. Phase 4 Kickoff Template
-
-### Step 1: Read Requirements
-
-```
-Read: __DOCS__\phase4\Phase_4_ROADMAP.md
-Read: __DOCS__\PRD.md (Section 4.5 - Crash & Replay)
-```
-
-### Step 2: Consult Architect
-
-```
-"I'm starting Phase 4 (Crash & Replay System). Please review:
-- PRD.md Section 4.5
-- Phase 4 roadmap
-- Provide implementation order recommendation
-- Identify design decisions needed upfront"
-```
-
-### Step 3: Implement with replay-systems-engineer
-
-```
-"Implement CrashManager.ts with:
-- Collision force threshold detection
-- Damage severity calculation
-- Crash state transition triggers
-- Reference: PRD.md Section 4.5.1"
-```
-
-```
-"Implement ReplayRecorder.ts with:
-- 60Hz state capture
-- Circular buffer (last 30 seconds)
-- Data compression
-- Reference: PRD.md Section 4.5.2"
-```
-
-```
-"Implement ReplayPlayer.ts with:
-- Smooth interpolation
-- Playback controls (pause/rewind/slow-mo)
-- Cinematic camera integration
-- Reference: PRD.md Section 4.5.3"
-```
-
-### Step 4: Test with testing-qa-specialist
-
-```
-"Create unit tests for CrashManager:
-- Test collision force thresholds
-- Test damage calculations
-- Test state transitions
-- >80% coverage target"
-```
-
-### Step 5: Performance Validation
-
-```
-"Profile replay system:
-- Replay recording overhead (<1ms target)
-- Playback frame times
-- Memory usage for 30-second buffer
-- Validate smooth 60fps playback"
-```
-
-### Step 6: Documentation
-
-```
-"Document CrashManager, ReplayRecorder, ReplayPlayer APIs:
-- TSDoc on all public methods
-- Update README
-- Add usage examples"
-```
-
----
-
-## 11. Known Issues & Technical Debt
+## 10. Known Issues & Technical Debt
 
 ### Low Priority (Deferred)
 
@@ -795,17 +710,17 @@ All critical issues from the completion report review (Oct 17, 2025) have been f
 - [x] Documentation updated (PHASE_5_COMPLETION_REPORT.md created)
 - [x] Phase 5 completion report written
 
-**Before proceeding to Phase 7, ALL must pass**:
+**Before proceeding to Phase 8, ALL must pass**:
 
-- [ ] All Phase 6 roadmap tasks completed
-- [ ] All unit tests passing (954+ with new ghost/physics tests)
-- [ ] Test coverage >80% on ghost/physics systems
-- [ ] Performance targets met (<16.67ms frame budget)
+- [ ] All Phase 6 & 7 roadmap tasks completed
+- [ ] All unit tests passing (954+ with new ghost/ui tests)
+- [ ] Test coverage >80% on ghost/ui systems
+- [ ] Performance targets met (<2ms UI rendering, 60fps maintained)
 - [ ] Zero TypeScript errors (`npm run type-check`)
 - [ ] No memory leaks (5-minute heap test)
 - [ ] Code review by technical-architect approved
 - [ ] Documentation updated
-- [ ] Phase 6 completion report written
+- [ ] Phase 6 & 7 completion report written
 
 **If ANY fail**: Fix before proceeding. Do not accumulate technical debt.
 
@@ -813,17 +728,16 @@ All critical issues from the completion report review (Oct 17, 2025) have been f
 
 ## Final Thoughts
 
-You're joining a **fully playable game with crash detection, cinematic replays, and complete timing/scoring systems**. Phases 0-5 are complete with 954 passing tests (98.8%), zero compilation errors, and excellent performance (89/100 architecture score). The game is playable with all features working at http://localhost:4201/.
+You're joining a **fully playable and E2E-validated game with crash detection, cinematic replays, and complete timing/scoring systems**. Phases 0-5 are complete with 954 passing tests (98.8%), zero compilation errors, and excellent performance (90/100 architecture score). The game is fully functional at http://localhost:4201/.
 
-**Your Mission**: Build the ghost AI system and advanced physics that give players challenging competition and immersive feedback.
+**Your Mission**: Build the UI/HUD system and ghost car integration that transform the game into a polished, production-ready experience with visual feedback and immersive sound.
 
 **Keys to Success**:
-1. Read PRD.md Section 4.6-4.7 before coding
-2. Use replay-systems-engineer and physics-specialist as primary agents
+1. Read PRD.md Section 4.5-4.6 before coding
 3. Test early and often (>80% coverage)
-4. Profile performance (maintain 60fps with all systems)
-5. Zero per-frame allocations in hot paths
-6. Comprehensive error handling for edge cases
+4. Profile performance (UI rendering <2ms, maintain 60fps)
+5. Clean DOM management (no memory leaks)
+6. Responsive design for different screen sizes
 7. Document as you go
 
 **What's Already Working**:

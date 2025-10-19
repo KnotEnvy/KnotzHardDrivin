@@ -209,8 +209,9 @@ export class CrashManager {
   /**
    * Time when crash detection was initialized.
    * Used to enforce grace period.
+   * Initialized to -1 to indicate "not set" (0 is a valid game time).
    */
-  private initTime = 0;
+  private initTime = -1;
 
   constructor() {
     // Initialize velocity tracking
@@ -243,7 +244,7 @@ export class CrashManager {
     this.stateTransitionCallback = stateTransitionCallback;
     this.enabled = true;
     this.lastReplayTriggerTime = -this.CRASH_REPLAY_COOLDOWN;
-    this.initTime = 0; // Will be set on first update() call
+    this.initTime = -1; // Will be set on first update() call
 
     // Initialize previousVelocity with vehicle's current velocity
     // This prevents false crash detection on first frame
@@ -279,7 +280,7 @@ export class CrashManager {
     this.currentTime = gameTime;
 
     // Set init time on first update (for grace period)
-    if (this.initTime === 0) {
+    if (this.initTime < 0) {
       this.initTime = gameTime;
     }
 
