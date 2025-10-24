@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { PhysicsWorld } from '../core/PhysicsWorld';
 import { SurfaceType } from '../types/VehicleTypes';
+import { Obstacle, ObstacleType } from './Obstacle';
 
 /**
  * Track section type definitions.
@@ -44,6 +45,14 @@ export interface SpawnPointData {
 }
 
 /**
+ * Obstacle data from track JSON.
+ */
+export interface ObstacleData {
+  type: 'cone' | 'barrier' | 'tire_wall';
+  position: [number, number, number];
+}
+
+/**
  * Complete track data loaded from JSON.
  */
 export interface TrackData {
@@ -52,6 +61,7 @@ export interface TrackData {
   width: number;
   waypoints: WaypointData[];
   spawnPoint: SpawnPointData;
+  obstacles?: ObstacleData[];
 }
 
 /**
@@ -69,6 +79,8 @@ export class Track {
   private spline!: THREE.CatmullRomCurve3;
   private trackData: TrackData;
   private physicsWorld: PhysicsWorld; // Store reference for cleanup
+  private scene: THREE.Scene; // Store reference for obstacle cleanup
+  private obstacles: Obstacle[] = []; // Track obstacles
 
   // Temp objects to avoid per-frame allocations
   private tempVec1 = new THREE.Vector3();
@@ -85,6 +97,7 @@ export class Track {
   constructor(data: TrackData, world: PhysicsWorld, scene: THREE.Scene) {
     this.trackData = data;
     this.physicsWorld = world; // Store for cleanup
+    this.scene = scene; // Store for obstacle cleanup
 
     // Generate track geometry
     this.generateSpline(data.sections);
@@ -94,7 +107,10 @@ export class Track {
     // Add to scene
     scene.add(this.mesh);
 
-    console.log(`Track "${data.name}" loaded: ${data.sections.length} sections, ${data.waypoints.length} waypoints`);
+    // Create obstacles
+    this.createObstacles(data.obstacles, world, scene);
+
+    console.log(`Track "${data.name}" loaded: ${data.sections.length} sections, ${data.waypoints.length} waypoints, ${this.obstacles.length} obstacles`);
   }
 
   /**
@@ -315,8 +331,9 @@ export class Track {
       vertices.push(rightEdge.x, rightEdge.y, rightEdge.z);
 
       // Add UVs (for texture mapping)
-      uvs.push(0, t * 10); // Left edge, tiled vertically
-      uvs.push(1, t * 10); // Right edge
+      // Increased tiling to create more frequent stripes/texture
+      uvs.push(0, t * 20); // Left edge, tiled vertically
+      uvs.push(1, t * 20); // Right edge
 
       // Add normals (pointing up)
       normals.push(0, 1, 0);
@@ -349,12 +366,13 @@ export class Track {
     // Compute vertex normals for smooth shading
     geometry.computeVertexNormals();
 
-    // Create material (placeholder - will be replaced with textured material)
+    // Create material with better shading to reduce visible seams
     const material = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      roughness: 0.8,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
+      color: 0x2a2a2a, // Slightly lighter for better detail visibility
+      roughness: 0.9, // Higher roughness reduces specular highlights that show seams
+      metalness: 0.05, // Less metalness for more diffuse lighting
+      side: THREE.FrontSide, // Single-sided to prevent z-fighting
+      flatShading: false, // Ensure smooth shading
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -418,6 +436,31 @@ export class Track {
     console.log(
       `Track collider created: ${vertices.length / 3} vertices, ${indices.length / 3} triangles, isSensor=${this.collider.isSensor()}, handle=${this.collider.handle}`
     );
+  }
+
+  /**
+   * Creates obstacles from track data.
+   *
+   * @param obstacleData - Array of obstacle configurations
+   * @param world - Physics world for collision
+   * @param scene - Three.js scene to add obstacles to
+   */
+  private createObstacles(obstacleData: ObstacleData[] | undefined, world: PhysicsWorld, scene: THREE.Scene): void {
+    if (!obstacleData || obstacleData.length === 0) {
+      return;
+    }
+
+    for (const data of obstacleData) {
+      const position = new THREE.Vector3(data.position[0], data.position[1], data.position[2]);
+      const obstacleType = data.type === 'cone' ? ObstacleType.CONE :
+                          data.type === 'barrier' ? ObstacleType.BARRIER :
+                          ObstacleType.TIRE_WALL;
+
+      const obstacle = new Obstacle(obstacleType, position, world, scene);
+      this.obstacles.push(obstacle);
+    }
+
+    console.log(`Created ${this.obstacles.length} obstacles`);
   }
 
   /**
@@ -513,6 +556,12 @@ export class Track {
 
     // Remove from scene
     this.mesh.removeFromParent();
+
+    // Dispose all obstacles
+    for (const obstacle of this.obstacles) {
+      obstacle.dispose(this.physicsWorld, this.scene);
+    }
+    this.obstacles = [];
 
     // Remove collider and rigid body from physics world
     if (this.collider && this.physicsWorld.world) {

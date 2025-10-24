@@ -111,14 +111,15 @@ export class CrashManager {
   /**
    * Impact force threshold for minor damage (Newtons).
    * Below this: no replay, just minor damage.
+   * Raised to 25000N to avoid false positives during normal driving.
    */
-  private readonly MINOR_CRASH_THRESHOLD = 5000;
+  private readonly MINOR_CRASH_THRESHOLD = 25000;
 
   /**
    * Impact force threshold for major damage (Newtons).
    * Between minor and this: trigger replay.
    */
-  private readonly MAJOR_CRASH_THRESHOLD = 15000;
+  private readonly MAJOR_CRASH_THRESHOLD = 50000;
 
   /**
    * Hard landing threshold (vertical velocity in m/s).
@@ -204,14 +205,13 @@ export class CrashManager {
    * Grace period after initialization (seconds).
    * Crash detection is disabled for this duration to allow physics to settle.
    */
-  private readonly GRACE_PERIOD = 0.5; // 500ms / ~30 frames
+  private readonly GRACE_PERIOD = 1.5; // 1500ms / ~90 frames - allows vehicle to settle after spawn
 
   /**
-   * Time when crash detection was initialized.
-   * Used to enforce grace period.
-   * Initialized to -1 to indicate "not set" (0 is a valid game time).
+   * Internal timer tracking time since CrashManager was enabled.
+   * Incremented each frame with deltaTime.
    */
-  private initTime = -1;
+  private timeSinceEnabled = 0;
 
   constructor() {
     // Initialize velocity tracking
@@ -244,7 +244,7 @@ export class CrashManager {
     this.stateTransitionCallback = stateTransitionCallback;
     this.enabled = true;
     this.lastReplayTriggerTime = -this.CRASH_REPLAY_COOLDOWN;
-    this.initTime = -1; // Will be set on first update() call
+    this.timeSinceEnabled = 0; // Reset grace period timer
 
     // Initialize previousVelocity with vehicle's current velocity
     // This prevents false crash detection on first frame
@@ -279,10 +279,8 @@ export class CrashManager {
 
     this.currentTime = gameTime;
 
-    // Set init time on first update (for grace period)
-    if (this.initTime < 0) {
-      this.initTime = gameTime;
-    }
+    // Increment time since enabled for grace period check
+    this.timeSinceEnabled += deltaTime;
 
     // Check for crashes based on velocity changes
     this.detectCollisionImpact();
@@ -313,8 +311,7 @@ export class CrashManager {
 
     // Grace period: skip crash detection immediately after spawn
     // Allows physics to settle (vehicle falling to ground, etc.)
-    const timeSinceInit = this.currentTime - this.initTime;
-    if (timeSinceInit < this.GRACE_PERIOD) {
+    if (this.timeSinceEnabled < this.GRACE_PERIOD) {
       return;
     }
 
@@ -325,8 +322,19 @@ export class CrashManager {
     this.velocityDelta.copy(currentVelocity).sub(this.previousVelocity);
     const velocityChangeMagnitude = this.velocityDelta.length();
 
+    // Check if this is a velocity DECREASE (collision) or INCREASE (acceleration)
+    // Only trigger crashes on decreases to avoid false positives during normal driving
+    const currentSpeed = currentVelocity.length();
+    const previousSpeed = this.previousVelocity.length();
+    const isDeceleration = currentSpeed < previousSpeed;
+
     // No collision if velocity is stable
     if (velocityChangeMagnitude < 0.1) {
+      return;
+    }
+
+    // Ignore velocity increases (acceleration) - only detect decelerations (collisions)
+    if (!isDeceleration) {
       return;
     }
 
@@ -395,8 +403,7 @@ export class CrashManager {
     }
 
     // Grace period: skip crash detection immediately after spawn
-    const timeSinceInit = this.currentTime - this.initTime;
-    if (timeSinceInit < this.GRACE_PERIOD) {
+    if (this.timeSinceEnabled < this.GRACE_PERIOD) {
       return;
     }
 

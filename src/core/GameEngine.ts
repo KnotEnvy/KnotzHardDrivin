@@ -4,11 +4,12 @@ import { StateManager } from './StateManager';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor';
 import { Vehicle } from '../entities/Vehicle';
 import { InputSystem } from '../systems/InputSystem';
-import { CameraSystem } from '../systems/CameraSystem';
+import { CameraSystem, CameraMode } from '../systems/CameraSystem';
 import { TimerSystem, TimerEvent } from '../systems/TimerSystem';
 import { LeaderboardSystem } from '../systems/LeaderboardSystem';
 import { StatisticsSystem } from '../systems/StatisticsSystem';
-import { DEFAULT_VEHICLE_CONFIG } from '../config/PhysicsConfig';
+import { DEFAULT_VEHICLE_CONFIG, DEFAULT_BRAKE_CONFIG } from '../config/PhysicsConfig';
+import { VehicleModelType } from '../entities/models/VehicleModelTypes';
 import { Track, TrackData } from '../entities/Track';
 import { WaypointSystem, WaypointData } from '../systems/WaypointSystem';
 import { CrashManager, CrashEvent } from '../systems/CrashManager';
@@ -71,6 +72,7 @@ export class GameEngine {
 
   // Phase 7A: UI System
   private uiSystem: UISystem | null = null;
+  private selectedVehicleType: 'corvette' | 'cybertruck' = 'corvette';
 
   // Phase 7B: Audio System
   private audioSystem: AudioSystem | null = null;
@@ -123,6 +125,9 @@ export class GameEngine {
   async start(): Promise<void> {
     try {
       await this.physicsWorld.init();
+
+      // CRITICAL FIX: Create ground collider to prevent falling through world
+      this.sceneManager.createGroundCollider(this.physicsWorld.world);
 
       // Phase 7B: Initialize Audio System
       this.audioSystem = AudioSystem.getInstance();
@@ -730,34 +735,89 @@ export class GameEngine {
     if (!this.uiSystem) return;
 
     // Main Menu - Start button
-    this.uiSystem.onButtonClick('btn-start', async () => {
-      console.log('Start button clicked');
+    this.uiSystem.onButtonClick('btn-start', () => {
+      console.log('Start button clicked - showing car selection');
+      this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
+    });
+
+    // Car Selection - Corvette
+    this.uiSystem.onButtonClick('select-corvette', async () => {
+      console.log('Corvette selected');
+      this.selectedVehicleType = 'corvette';
       await this.initializeRace();
       this.setState(GameState.PLAYING);
       this.uiSystem?.showPanel(UIPanel.HUD);
     });
 
-    // Keyboard shortcut: SPACE to start from menu
+    // Car Selection - Cybertruck
+    this.uiSystem.onButtonClick('select-cybertruck', async () => {
+      console.log('Cybertruck selected');
+      this.selectedVehicleType = 'cybertruck';
+      await this.initializeRace();
+      this.setState(GameState.PLAYING);
+      this.uiSystem?.showPanel(UIPanel.HUD);
+    });
+
+    // Global keyboard shortcuts
     window.addEventListener('keydown', async (e) => {
+      // SPACE to start from menu (show car selection)
       if (e.code === 'Space' && this.state === GameState.MENU) {
         e.preventDefault();
-        console.log('Space pressed - starting race');
-        await this.initializeRace();
-        this.setState(GameState.PLAYING);
-        this.uiSystem?.showPanel(UIPanel.HUD);
+        console.log('Space pressed - showing car selection');
+        this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
+      }
+
+      // ESC to toggle pause (PLAYING <-> PAUSED)
+      if (e.code === 'Escape') {
+        if (this.state === GameState.PLAYING) {
+          e.preventDefault();
+          console.log('ESC pressed - pausing game');
+          this.setState(GameState.PAUSED);
+          this.uiSystem?.showPanel(UIPanel.PAUSE_MENU);
+        } else if (this.state === GameState.PAUSED) {
+          e.preventDefault();
+          console.log('ESC pressed - resuming game');
+          this.setState(GameState.PLAYING);
+          this.uiSystem?.showPanel(UIPanel.HUD);
+        }
+      }
+
+      // C to switch camera views (only when playing)
+      if (e.code === 'KeyC' && this.state === GameState.PLAYING) {
+        e.preventDefault();
+        const currentMode = this.cameraSystem.getMode();
+
+        // Cycle between FIRST_PERSON and CHASE_CAMERA (skip REPLAY mode)
+        if (currentMode === CameraMode.FIRST_PERSON) {
+          console.log('Camera: Switching to CHASE_CAMERA');
+          this.cameraSystem.setMode(CameraMode.CHASE_CAMERA);
+        } else if (currentMode === CameraMode.CHASE_CAMERA) {
+          console.log('Camera: Switching to FIRST_PERSON');
+          this.cameraSystem.setMode(CameraMode.FIRST_PERSON);
+        }
       }
     });
 
     // Main Menu - Leaderboard button
     this.uiSystem.onButtonClick('btn-leaderboard', () => {
       console.log('Leaderboard button clicked');
-      // TODO: Show leaderboard panel
+      const entries = this.leaderboardSystem.getLeaderboard();
+
+      if (entries.length === 0) {
+        alert('No leaderboard entries yet. Complete a race to set a time!');
+      } else {
+        let leaderboardText = '=== LEADERBOARD ===\n\n';
+        entries.forEach((entry, index) => {
+          leaderboardText += `${index + 1}. ${entry.playerName} - ${entry.lapTime}\n`;
+        });
+        alert(leaderboardText);
+      }
     });
 
     // Main Menu - Settings button
     this.uiSystem.onButtonClick('btn-settings', () => {
       console.log('Settings button clicked');
-      // TODO: Show settings panel
+      alert('Settings panel coming soon!\n\nControls:\n- W/S: Throttle/Brake\n- A/D: Steer\n- Space: Handbrake\n- R: Reset\n- ESC: Pause\n- C: Switch Camera');
     });
 
     // Pause Menu - Resume button
@@ -968,10 +1028,16 @@ export class GameEngine {
       // Get spawn point from track
       const spawnPoint = this.track.getSpawnPoint();
 
-      // Create vehicle at spawn position
+      // Create vehicle at spawn position with selected model type
+      const modelType = this.selectedVehicleType === 'corvette'
+        ? VehicleModelType.CORVETTE
+        : VehicleModelType.CYBERTRUCK;
+
       this.vehicle = new Vehicle(
         this.physicsWorld.world,
-        DEFAULT_VEHICLE_CONFIG
+        DEFAULT_VEHICLE_CONFIG,
+        DEFAULT_BRAKE_CONFIG,
+        modelType
       );
 
       await this.vehicle.init(

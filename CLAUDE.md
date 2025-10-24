@@ -3,8 +3,8 @@
 **Project**: Hard Drivin' Remake
 **Stack**: TypeScript + Three.js + Rapier.js + Vite + Howler.js
 **Current Phase**: Phase 6 & 7 (Ghost AI + UI/HUD + Audio) - IN PROGRESS
-**Last Updated**: October 18, 2025 (Evening)
-**Document Version**: 6.0
+**Last Updated**: October 22, 2025
+**Document Version**: 6.1
 
 ---
 
@@ -162,13 +162,13 @@ A modern, browser-based reimagining of the classic **Hard Drivin'** arcade racer
 
 **Phase 4: Crash & Replay System** ✅ COMPLETE (October 18, 2025)
 *(Completion Report: `__DOCS__\phase4\PHASE_4_COMPLETION_REPORT.md`)*
-- CrashManager (857 lines) - Force-based crash detection (5000N/15000N/22500N thresholds)
+- CrashManager (857 lines) - Force-based crash detection (25000N/50000N thresholds, updated Oct 22)
 - ReplayRecorder (389 lines) - 60Hz frame capture, 30-second ring buffer
 - ReplayPlayer (490 lines) - Smooth interpolation, playback speed controls
 - ReplayUI (373 lines) - Complete overlay with 10 controls
 - Vehicle.applyReplayFrame() - Kinematic replay positioning
 - Cinematic crash replay camera (CRASH_REPLAY mode)
-- Critical fix: Added 500ms grace period to prevent false crashes
+- Critical fix: Added 1.5s grace period to prevent false crashes (updated Oct 22)
 - Critical fix: Added SceneManager.update() call for environment rendering
 - 115 new unit tests (791 total, 98.1% passing)
 - Architecture score: 88/100 (GO to Phase 5)
@@ -184,7 +184,28 @@ A modern, browser-based reimagining of the classic **Hard Drivin'** arcade racer
 - 163 new unit tests (954 total, 98.8% passing)
 - Architecture score: 89/100 (GO to Phase 6)
 
-### Key Metrics (Current - October 18, 2025 Evening)
+**Phase 5.5: Critical Crash Detection & Track Fixes** ✅ COMPLETE (October 22, 2025)
+*Pre-Phase 6 polish: Fixed remaining issues from Phase 4 & 3*
+- **Crash Detection Improvements**:
+  - Fixed grace period timing bug (negative time values) by using internal timer
+  - Increased grace period from 500ms to 1.5s to prevent false crashes on spawn
+  - Raised crash thresholds: MINOR 5000N → 25000N, MAJOR 15000N → 50000N
+  - Added deceleration-only detection (ignores acceleration to prevent false positives)
+  - Crash detection now accurately triggers only on real collisions
+- **Track Geometry Fix**:
+  - Fixed track flying in air by changing section types from "bank" to "curve"
+  - Track now properly flat on ground with correct curved banking sections
+- **Vehicle Selection Fix**:
+  - Integrated VehicleModelFactory to properly display Corvette vs Cybertruck models
+  - Vehicle constructor now accepts modelType parameter
+- **State Machine Updates**:
+  - Added MENU and PLAYING as valid transitions from CRASHED state
+  - Players can now restart race or return to menu after crash
+- **Code Cleanup**:
+  - Removed all debug logging ([CrashDebug], [ObstacleDebug], [VehicleDebug])
+  - Clean console output ready for production
+
+### Key Metrics (Current - October 22, 2025)
 
 | Metric | Value | Status |
 |--------|-------|--------|
@@ -682,6 +703,14 @@ All critical issues from the completion report review (Oct 17, 2025) have been f
 - ✅ Per-frame allocations eliminated
 - ✅ All unit tests passing
 
+Additional fixes (Oct 22, 2025):
+- ✅ Crash detection grace period timing bug resolved
+- ✅ Crash thresholds tuned to prevent false positives
+- ✅ Track geometry corrected (no longer flying in air)
+- ✅ Vehicle model selection working correctly
+- ✅ State machine transitions updated for proper flow
+- ✅ Debug logging removed for clean production output
+
 ---
 
 ## 12. Testing Gates Between Phases
@@ -743,12 +772,14 @@ You're joining a **fully playable and E2E-validated game with crash detection, c
 **What's Already Working**:
 - Complete game engine with fixed timestep loop (60fps physics)
 - Realistic vehicle physics with 4-wheel raycasting
-- Track generation with waypoints and lap tracking
-- Crash detection with force-based thresholds and penalties
-- Cinematic replay system with smooth playback
+- Track generation with waypoints and lap tracking (flat ground, proper banking)
+- Crash detection with tuned thresholds (25000N/50000N) and deceleration-only detection
+- Cinematic replay system with smooth playback and 1.5s grace period
 - Race timer with lap tracking and checkpoints
 - Top 10 leaderboard with persistent storage
 - Career statistics tracking across sessions
+- Vehicle model selection (Corvette vs Cybertruck) working correctly
+- Clean production console output (debug logging removed)
 - 954 unit tests with >94% coverage
 
 **When in Doubt**:
@@ -761,8 +792,8 @@ You're joining a **fully playable and E2E-validated game with crash detection, c
 
 ---
 
-**Document Version**: 5.1
-**Last Updated**: October 18, 2025
-**Status**: ✅ Phase 5 Complete, Ready for Phase 6
-**Next Phase**: Ghost AI & Advanced Physics
-**Game Status**: ✅ Fully playable with timing, scoring, and replays
+**Document Version**: 6.1
+**Last Updated**: October 22, 2025
+**Status**: ✅ Phase 5.5 Complete (Crash & Track Fixes), Phase 6 & 7 In Progress
+**Next Phase**: Complete Phase 6 & 7 (Ghost AI + UI/HUD + Audio)
+**Game Status**: ✅ Fully playable with tuned crash detection, timing, scoring, and replays

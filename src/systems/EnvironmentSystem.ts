@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat';
 
 /**
  * Quality settings for environment rendering
@@ -73,6 +74,7 @@ export class EnvironmentSystem {
   // Ground components
   private groundMesh: THREE.Mesh | null = null;
   private groundTexture: THREE.Texture | null = null;
+  private groundCollider: number | null = null; // Rapier collider handle
 
   // Sky components
   private skyDome: THREE.Mesh | null = null;
@@ -124,6 +126,39 @@ export class EnvironmentSystem {
     console.log(`   Ground texture: ${this.settings.groundTextureResolution}x${this.settings.groundTextureResolution}`);
     console.log(`   Clouds: ${this.settings.cloudCount}`);
     console.log(`   Sky segments: ${this.settings.skyDomeSegments}`);
+  }
+
+  /**
+   * Create physics collider for the ground plane
+   *
+   * This must be called AFTER init() and AFTER the physics world is ready.
+   * Creates a large static box collider at Y=0 to prevent falling through the world.
+   *
+   * @param physicsWorld - Rapier physics world instance
+   */
+  public createGroundCollider(physicsWorld: RAPIER.World): void {
+    if (this.groundCollider !== null) {
+      console.warn('Ground collider already exists, skipping creation');
+      return;
+    }
+
+    // Create a large static box collider at Y=0
+    const groundSize = 2000; // Same as visual ground plane
+    const groundThickness = 0.1; // Thin collision box
+
+    const groundColliderDesc = RAPIER.ColliderDesc.cuboid(
+      groundSize / 2,  // half-width
+      groundThickness / 2,  // half-height (thin)
+      groundSize / 2   // half-depth
+    )
+      .setTranslation(0, -groundThickness / 2, 0) // Position at Y=0 (top surface)
+      .setFriction(0.8)  // High friction for grip
+      .setRestitution(0.1); // Low bounciness
+
+    const collider = physicsWorld.createCollider(groundColliderDesc);
+    this.groundCollider = collider.handle;
+
+    console.log('✅ Ground physics collider created (2000x2000 static box)');
   }
 
   /**
@@ -696,6 +731,10 @@ export class EnvironmentSystem {
       this.groundMesh = null;
       this.groundTexture = null;
     }
+
+    // Reset ground collider handle
+    // Note: The physics world will clean up the actual collider when it's disposed
+    this.groundCollider = null;
 
     // Dispose sky dome
     if (this.skyDome) {

@@ -24,6 +24,8 @@ import {
   ADVANCED_TUNING,
 } from '../config/PhysicsConfig';
 import { ReplayFrame } from '../systems/ReplayRecorder';
+import { VehicleModelType } from './models/VehicleModelTypes';
+import { VehicleModelFactory } from './models/VehicleModelFactory';
 
 /**
  * Vehicle class implementing full physics simulation with Rapier.js.
@@ -56,6 +58,7 @@ export class Vehicle {
   // Configuration
   private config: VehicleConfig;
   private brakeConfig: BrakeConfig;
+  private modelType: VehicleModelType;
 
   // Physics world reference
   private world: RAPIER.World;
@@ -124,11 +127,13 @@ export class Vehicle {
   constructor(
     world: RAPIER.World,
     config: VehicleConfig = DEFAULT_VEHICLE_CONFIG,
-    brakeConfig: BrakeConfig = DEFAULT_BRAKE_CONFIG
+    brakeConfig: BrakeConfig = DEFAULT_BRAKE_CONFIG,
+    modelType: VehicleModelType = VehicleModelType.CORVETTE
   ) {
     this.world = world;
     this.config = config;
     this.brakeConfig = brakeConfig;
+    this.modelType = modelType;
 
     // Initialize wheel states
     this.wheels = [
@@ -1282,71 +1287,21 @@ export class Vehicle {
       return;
     }
 
-    // Create a group to hold all parts of the car body
-    const chassisGroup = new THREE.Group();
-    chassisGroup.name = 'corvette-body';
-
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff0000, // Red
-      metalness: 0.8,
-      roughness: 0.2,
-    });
-
-    // Main body
-    const mainBodyGeo = new THREE.BoxGeometry(2.0, 0.6, 4.5);
-    const mainBody = new THREE.Mesh(mainBodyGeo, bodyMaterial);
-    mainBody.position.y = 0.3;
-    chassisGroup.add(mainBody);
-
-    // Hood
-    const hoodGeo = new THREE.BoxGeometry(1.8, 0.4, 2.0);
-    const hood = new THREE.Mesh(hoodGeo, bodyMaterial);
-    hood.position.set(0, 0.5, 1.25);
-    chassisGroup.add(hood);
-
-    // Cabin
-    const cabinGeo = new THREE.BoxGeometry(1.6, 0.8, 1.5);
-    const cabin = new THREE.Mesh(cabinGeo, bodyMaterial);
-    cabin.position.set(0, 1.0, -0.5);
-    chassisGroup.add(cabin);
-
-    // Rear deck
-    const rearDeckGeo = new THREE.BoxGeometry(1.8, 0.3, 1.0);
-    const rearDeck = new THREE.Mesh(rearDeckGeo, bodyMaterial);
-    rearDeck.position.set(0, 0.45, -1.75);
-    chassisGroup.add(rearDeck);
+    // Create vehicle model using factory
+    const factory = new VehicleModelFactory();
+    const chassisGroup = factory.createVehicleMesh(this.modelType);
 
     chassisGroup.castShadow = true;
     chassisGroup.receiveShadow = true;
     this.scene.add(chassisGroup);
-
     this.chassisMesh = chassisGroup;
 
-    // Create wheel meshes (cylinders rotated to align with X-axis)
-    const wheelMaterial = new THREE.MeshStandardMaterial({
-      color: 0x333333, // Dark gray
-      metalness: 0.3,
-      roughness: 0.7,
-    });
+    // Create wheel meshes using factory
+    const wheelMeshes = factory.createWheelMeshes(this.modelType, this.config.wheels);
 
     for (let i = 0; i < 4; i++) {
-      const wheelConfig = this.config.wheels[i];
-      const wheelGeometry = new THREE.CylinderGeometry(
-        wheelConfig.radius,
-        wheelConfig.radius,
-        wheelConfig.width,
-        16 // segments
-      );
-
-      // Rotate cylinder to align with X-axis (cylinders default to Y-axis)
-      wheelGeometry.rotateZ(Math.PI / 2);
-
-      const wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
-      wheelMesh.castShadow = true;
-      wheelMesh.receiveShadow = true;
-      this.scene.add(wheelMesh);
-
-      this.wheelMeshes[i] = wheelMesh;
+      this.scene.add(wheelMeshes[i]);
+      this.wheelMeshes[i] = wheelMeshes[i];
     }
 
     console.log('Vehicle visual meshes created');

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { EnvironmentSystem, ENVIRONMENT_QUALITY_PRESETS, EnvironmentQualitySettings } from '../systems/EnvironmentSystem';
 
 /**
@@ -304,6 +305,18 @@ export class SceneManager {
    */
   render(): void {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Create ground physics collider
+   *
+   * Must be called AFTER physics world is initialized.
+   * Delegates to EnvironmentSystem to create a large static box collider.
+   *
+   * @param physicsWorld - Rapier physics world instance
+   */
+  public createGroundCollider(physicsWorld: RAPIER.World): void {
+    this.environmentSystem.createGroundCollider(physicsWorld);
   }
 
   /**

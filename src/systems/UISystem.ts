@@ -37,6 +37,7 @@ import type { Vehicle } from '../entities/Vehicle';
  */
 export enum UIPanel {
   MAIN_MENU = 'main-menu',
+  CAR_SELECTION = 'car-selection',
   HUD = 'hud',
   PAUSE_MENU = 'pause-menu',
   RESULTS = 'results',
@@ -53,6 +54,7 @@ export class UISystem {
   // UI Elements
   private container: HTMLElement | null = null;
   private mainMenu: HTMLElement | null = null;
+  private carSelection: HTMLElement | null = null;
   private hud: HTMLElement | null = null;
   private pauseMenu: HTMLElement | null = null;
   private resultsScreen: HTMLElement | null = null;
@@ -100,6 +102,7 @@ export class UISystem {
 
     this.createUIContainer();
     this.createMainMenu();
+    this.createCarSelection();
     this.createHUD();
     this.createPauseMenu();
     this.createResultsScreen();
@@ -200,6 +203,137 @@ export class UISystem {
     `;
 
     this.container?.appendChild(this.mainMenu);
+  }
+
+  /**
+   * Creates car selection screen
+   */
+  private createCarSelection(): void {
+    this.carSelection = document.createElement('div');
+    this.carSelection.id = 'car-selection';
+    this.carSelection.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: all;
+    `;
+
+    this.carSelection.innerHTML = `
+      <h1 style="color: #fff; font-size: 3rem; margin-bottom: 3rem; text-shadow: 0 0 20px #00ff88;">
+        SELECT YOUR VEHICLE
+      </h1>
+      <div style="display: flex; gap: 3rem; margin-bottom: 2rem;">
+        <!-- Corvette Card -->
+        <div id="select-corvette" style="
+          width: 350px;
+          background: rgba(255, 0, 0, 0.1);
+          border: 3px solid #ff0000;
+          border-radius: 12px;
+          padding: 2rem;
+          cursor: pointer;
+          transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+          pointer-events: all;
+        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 0 30px rgba(255,0,0,0.5)';"
+           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+          <div style="
+            width: 100%;
+            height: 150px;
+            background: #ff0000;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+          ">
+            🏎️
+          </div>
+          <h2 style="color: #ff0000; font-size: 2rem; margin-bottom: 1rem; text-align: center;">
+            CORVETTE
+          </h2>
+          <div style="color: #aaa; font-size: 0.9rem; line-height: 1.6;">
+            <div style="margin-bottom: 0.5rem;">⚡ Speed: ★★★★★</div>
+            <div style="margin-bottom: 0.5rem;">🏋️ Handling: ★★★★☆</div>
+            <div style="margin-bottom: 0.5rem;">🛡️ Durability: ★★★☆☆</div>
+          </div>
+          <div style="
+            margin-top: 1.5rem;
+            padding: 0.8rem;
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            text-align: center;
+            font-weight: bold;
+          ">
+            CLASSIC SPORTS CAR
+          </div>
+        </div>
+
+        <!-- Cybertruck Card -->
+        <div id="select-cybertruck" style="
+          width: 350px;
+          background: rgba(192, 192, 192, 0.1);
+          border: 3px solid #c0c0c0;
+          border-radius: 12px;
+          padding: 2rem;
+          cursor: pointer;
+          transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+          pointer-events: all;
+        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 0 30px rgba(192,192,192,0.5)';"
+           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
+          <div style="
+            width: 100%;
+            height: 150px;
+            background: #c0c0c0;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+          ">
+            🚙
+          </div>
+          <h2 style="color: #c0c0c0; font-size: 2rem; margin-bottom: 1rem; text-align: center;">
+            CYBERTRUCK
+          </h2>
+          <div style="color: #aaa; font-size: 0.9rem; line-height: 1.6;">
+            <div style="margin-bottom: 0.5rem;">⚡ Speed: ★★★☆☆</div>
+            <div style="margin-bottom: 0.5rem;">🏋️ Handling: ★★★☆☆</div>
+            <div style="margin-bottom: 0.5rem;">🛡️ Durability: ★★★★★</div>
+          </div>
+          <div style="
+            margin-top: 1.5rem;
+            padding: 0.8rem;
+            background: rgba(192, 192, 192, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            text-align: center;
+            font-weight: bold;
+          ">
+            FUTURISTIC BEAST
+          </div>
+        </div>
+      </div>
+
+      <div style="
+        position: absolute;
+        bottom: 2rem;
+        color: #888;
+        font-size: 0.9rem;
+      ">
+        Select a vehicle to begin | ESC to go back
+      </div>
+    `;
+
+    this.container?.appendChild(this.carSelection);
   }
 
   /**
@@ -434,6 +568,9 @@ export class UISystem {
       case UIPanel.MAIN_MENU:
         if (this.mainMenu) this.mainMenu.style.display = 'flex';
         break;
+      case UIPanel.CAR_SELECTION:
+        if (this.carSelection) this.carSelection.style.display = 'flex';
+        break;
       case UIPanel.HUD:
         if (this.hud) this.hud.style.display = 'block';
         break;
@@ -451,6 +588,7 @@ export class UISystem {
    */
   private hideAll(): void {
     if (this.mainMenu) this.mainMenu.style.display = 'none';
+    if (this.carSelection) this.carSelection.style.display = 'none';
     if (this.hud) this.hud.style.display = 'none';
     if (this.pauseMenu) this.pauseMenu.style.display = 'none';
     if (this.resultsScreen) this.resultsScreen.style.display = 'none';

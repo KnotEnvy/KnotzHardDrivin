@@ -8,9 +8,9 @@ const engine = new GameEngine();
 
 // Start the game engine
 engine.start().then(() => {
-  // Auto-start in PLAYING mode for Phase 2 testing
-  console.log('Auto-starting game in PLAYING mode...');
-  engine.setState(GameState.PLAYING);
+  // Game will start in MENU state - user must click START RACE button
+  console.log('Game ready! Click START RACE to begin.');
+  // Note: Auto-start disabled for Phase 6 - proper menu flow
 });
 
 // Add FPS display for monitoring performance

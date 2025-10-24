@@ -7,26 +7,24 @@
       "length": 120
     },
     {
-      "type": "bank",
+      "type": "curve",
       "radius": 50,
-      "angle": 90,
-      "banking": 15
+      "angle": 90
     },
     {
       "type": "straight",
       "length": 120
     },
     {
-      "type": "bank",
+      "type": "curve",
       "radius": 50,
-      "angle": 90,
-      "banking": 15
+      "angle": 90
     }
   ],
   "waypoints": [
     {
       "id": 0,
-      "position": [0, 0, 10],
+      "position": [0, 0.2, 10],
       "direction": [0, 0, 1],
       "triggerRadius": 12,
       "isCheckpoint": true,
@@ -34,49 +32,49 @@
     },
     {
       "id": 1,
-      "position": [0, 0, 120],
+      "position": [0, 0.2, 120],
       "direction": [0, 0, 1],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 2,
-      "position": [50, 0, 170],
+      "position": [50, 0.2, 170],
       "direction": [1, 0, 0],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 3,
-      "position": [100, 0, 170],
+      "position": [100, 0.2, 170],
       "direction": [1, 0, 0],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 4,
-      "position": [150, 0, 120],
+      "position": [150, 0.2, 120],
       "direction": [0, 0, -1],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 5,
-      "position": [150, 0, 10],
+      "position": [150, 0.2, 10],
       "direction": [0, 0, -1],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 6,
-      "position": [100, 0, 40],
+      "position": [100, 0.2, 40],
       "direction": [-1, 0, 0],
       "triggerRadius": 12,
       "isCheckpoint": false
     },
     {
       "id": 7,
-      "position": [50, 0, 40],
+      "position": [50, 0.2, 40],
       "direction": [-1, 0, 0],
       "triggerRadius": 12,
       "isCheckpoint": false
@@ -85,5 +83,87 @@
   "spawnPoint": {
     "position": [0, 2, 5],
     "rotation": [0, 0, 0, 1]
-  }
+  },
+  "obstacles": [
+    {
+      "type": "cone",
+      "position": [5, 0.3, 30]
+    },
+    {
+      "type": "cone",
+      "position": [-5, 0.3, 30]
+    },
+    {
+      "type": "cone",
+      "position": [5, 0.3, 60]
+    },
+    {
+      "type": "cone",
+      "position": [-5, 0.3, 60]
+    },
+    {
+      "type": "barrier",
+      "position": [12, 0.3, 90]
+    },
+    {
+      "type": "barrier",
+      "position": [-12, 0.3, 90]
+    },
+    {
+      "type": "tire_wall",
+      "position": [0, 0.5, 100]
+    },
+    {
+      "type": "cone",
+      "position": [5, 0.3, 150]
+    },
+    {
+      "type": "cone",
+      "position": [-5, 0.3, 150]
+    },
+    {
+      "type": "barrier",
+      "position": [70, 0.3, 170]
+    },
+    {
+      "type": "tire_wall",
+      "position": [130, 0.5, 170]
+    },
+    {
+      "type": "cone",
+      "position": [150, 0.3, 140]
+    },
+    {
+      "type": "cone",
+      "position": [150, 0.3, 100]
+    },
+    {
+      "type": "barrier",
+      "position": [150, 0.3, 70]
+    },
+    {
+      "type": "cone",
+      "position": [150, 0.3, 40]
+    },
+    {
+      "type": "cone",
+      "position": [145, 0.3, 20]
+    },
+    {
+      "type": "tire_wall",
+      "position": [130, 0.5, -10]
+    },
+    {
+      "type": "cone",
+      "position": [110, 0.3, -10]
+    },
+    {
+      "type": "cone",
+      "position": [70, 0.3, -10]
+    },
+    {
+      "type": "barrier",
+      "position": [40, 0.3, -10]
+    }
+  ]
 }

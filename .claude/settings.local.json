@@ -34,7 +34,17 @@
       "Bash(echo \"- <1ms per frame performance\")",
       "Bash(timeout 120 npm test)",
       "mcp__chrome-devtools__list_pages",
-      "mcp__chrome-devtools__click"
+      "mcp__chrome-devtools__click",
+      "Read(//tmp/chrome-devtools-mcp-PhmS6y/**)",
+      "Bash(timeout 5 echo:*)",
+      "Read(//tmp/chrome-devtools-mcp-GXEh1P/**)",
+      "Read(//tmp/chrome-devtools-mcp-FwWBAO/**)",
+      "Bash(timeout 3 echo:*)",
+      "Read(//tmp/chrome-devtools-mcp-WOd0VN/**)",
+      "mcp__chrome-devtools__evaluate_script",
+      "Read(//tmp/chrome-devtools-mcp-IbH2n8/**)",
+      "mcp__chrome-devtools__handle_dialog",
+      "Read(//tmp/chrome-devtools-mcp-KVjIbM/**)"
     ],
     "deny": [],
     "ask": []
