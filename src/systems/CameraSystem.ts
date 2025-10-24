@@ -349,61 +349,70 @@ export class CameraSystem {
     // Calculate elapsed time since replay started (in seconds)
     const elapsedTime = (performance.now() - this.replayCrashStartTime) / 1000;
 
+    // CHANGED: Follow the vehicle during replay instead of fixed crash point
+    // This gives a better view of the crash as it happens
+
     // Determine camera distance and height based on replay stage
-    // Stage 1 (0-3s): Wide establishing shot
+    // Adjusted for better overhead view - higher and further back
+    // Stage 1 (0-3s): Wide establishing shot - follow vehicle from far back
     if (elapsedTime < 3) {
-      this.replayStageDistance = 40; // Widest shot
-      this.replayStageHeight = 20;
+      this.replayStageDistance = 35; // Further back to see more context
+      this.replayStageHeight = 25;   // Higher up for better overhead view
     }
-    // Stage 2 (3-7s): Smooth transition toward crash
+    // Stage 2 (3-7s): Smooth transition closer to vehicle
     else if (elapsedTime < 7) {
-      // Interpolate between wide and medium shots
-      // Linear interpolation from 40m to 25m over 4 seconds
-      const progress = (elapsedTime - 3) / 4; // 0 to 1 over 4 seconds
-      this.replayStageDistance = THREE.MathUtils.lerp(40, 25, progress);
-      this.replayStageHeight = THREE.MathUtils.lerp(20, 15, progress);
+      const progress = (elapsedTime - 3) / 4;
+      this.replayStageDistance = THREE.MathUtils.lerp(35, 20, progress);
+      this.replayStageHeight = THREE.MathUtils.lerp(25, 18, progress);
     }
-    // Stage 3 (7-10s): Close-up on crash point
+    // Stage 3 (7-10s): Close-up on crash moment
     else {
       this.replayStageDistance = 15;
-      this.replayStageHeight = 10;
+      this.replayStageHeight = 12;  // Still elevated for good view
     }
 
     // Dramatic zoom-in at impact moment (seconds 8-9)
-    // Smoothly compress distance/height by 30% for final close-up effect
     if (elapsedTime >= 8 && elapsedTime <= 9) {
-      const zoomProgress = 1 - (elapsedTime - 8); // Goes from 1 to 0 over 1 second
-      const zoomFactor = 0.7 + zoomProgress * 0.3; // 0.7 to 1.0 (30% compression)
+      const zoomProgress = 1 - (elapsedTime - 8);
+      const zoomFactor = 0.7 + zoomProgress * 0.3;
       this.replayStageDistance *= zoomFactor;
       this.replayStageHeight *= zoomFactor;
     }
 
-    // Cinematic orbital arc: Slow circular motion around crash point
-    // Update orbit angle: Complete ~1.5 orbits over 10 seconds (540 degrees)
-    this.replayOrbitAngle += (deltaTime / this.replayCrashDuration) * Math.PI * 3;
+    // Calculate camera position FOLLOWING the vehicle (not the static crash point)
+    // Position camera behind and above the current vehicle position
+    // Use velocity for smoother camera positioning if available
+    const vehiclePos = this.tempVec3.copy(target.position);
 
-    // Calculate camera position with orbital arc around crash point
-    // Use sine wave for smooth horizontal arc, distance and height control vertical
-    // tempVec3 is used for orbital offset (avoid allocation)
-    const orbitalOffset = this.tempVec3.set(
-      Math.sin(this.replayOrbitAngle) * this.replayStageDistance,
-      this.replayStageHeight,
-      -Math.cos(this.replayOrbitAngle) * this.replayStageDistance
-    );
+    // Calculate direction to place camera behind vehicle
+    let cameraDirection = this.tempVec3_2.set(0, 0, -1); // Default: behind in local space
 
-    // Calculate ideal camera position relative to crash point
-    // Use tempVec3_2 for ideal position (reuse after orbital offset)
-    const idealCameraPos = this.tempVec3_2.copy(this.replayCrashPoint).add(orbitalOffset);
+    // If vehicle has velocity, position camera opposite to movement direction
+    if (target.velocity && target.velocity.lengthSq() > 0.1) {
+      cameraDirection.copy(target.velocity).normalize().negate();
+    } else {
+      // No velocity - use vehicle forward direction
+      cameraDirection.set(0, 0, -1).applyQuaternion(target.quaternion);
+    }
 
-    // Smooth camera position to prevent jittering
-    // Heavy damping (0.05) for cinematic feel
-    this.smoothPosition.lerp(idealCameraPos, this.replayDamping);
+    // Calculate ideal camera position: behind and above vehicle
+    const idealCameraPos = this.tempVec3_3.copy(vehiclePos);
+    idealCameraPos.add(cameraDirection.multiplyScalar(this.replayStageDistance));
+    idealCameraPos.y += this.replayStageHeight; // Add height for overhead view
+
+    // Add slight cinematic arc/orbit for drama (gentler than before)
+    // Orbital motion around the vehicle's position (not crash point)
+    this.replayOrbitAngle += (deltaTime / this.replayCrashDuration) * Math.PI * 1.5; // Slower orbit
+    const sideOffset = Math.sin(this.replayOrbitAngle) * (this.replayStageDistance * 0.3); // 30% side drift
+    idealCameraPos.x += sideOffset;
+
+    // Smooth camera position for cinematic feel
+    this.smoothPosition.lerp(idealCameraPos, this.replayDamping * 1.5); // Slightly more responsive
     this.camera.position.copy(this.smoothPosition);
 
-    // Always look at crash point (static focal point for entire replay)
-    // Use tempVec3_3 for look-at target (with slight upward offset for better framing)
-    const lookTarget = this.tempVec3_3.copy(this.replayCrashPoint).add(this.replayLookAtOffset);
-    this.smoothLookAt.lerp(lookTarget, this.replayDamping);
+    // Look at the vehicle (with slight upward offset for better framing)
+    const lookTarget = this.tempVec3.copy(target.position).add(this.replayLookAtOffset);
+    this.smoothLookAt.lerp(lookTarget, this.replayDamping * 1.5);
     this.camera.lookAt(this.smoothLookAt);
   }
 
@@ -623,7 +632,10 @@ export class CameraSystem {
     this.replayStageDistance = 30;
     this.replayStageHeight = 15;
 
-    console.log('Crash replay ended');
+    // Switch camera back to chase mode after replay
+    this.transitionTo(CameraMode.CHASE_CAMERA, 1.0);
+
+    console.log('Crash replay ended, returning to chase camera');
   }
 
   /**

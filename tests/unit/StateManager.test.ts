@@ -107,9 +107,9 @@ describe('StateManager', () => {
         expect(result).toBe(false);
       });
 
-      it('should reject REPLAY -> MENU (must return to PLAYING first)', () => {
+      it('should allow REPLAY -> MENU (quit to main menu)', () => {
         const result = stateManager.canTransition(GameState.REPLAY, GameState.MENU);
-        expect(result).toBe(false);
+        expect(result).toBe(true);
       });
 
       it('should reject PLAYING -> MENU (must pause or finish first)', () => {
@@ -184,7 +184,7 @@ describe('StateManager', () => {
 
     it('should return correct transitions for REPLAY state', () => {
       const transitions = stateManager.getValidTransitions(GameState.REPLAY);
-      expect(transitions).toEqual([GameState.PLAYING]);
+      expect(transitions).toEqual([GameState.PLAYING, GameState.MENU]);
     });
 
     it('should return correct transitions for RESULTS state', () => {

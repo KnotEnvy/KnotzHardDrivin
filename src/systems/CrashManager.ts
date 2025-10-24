@@ -653,7 +653,14 @@ export class CrashManager {
       `${crashEvent.position.y.toFixed(1)}, ${crashEvent.position.z.toFixed(1)})`
     );
 
-    // Notify replay trigger listeners
+    // Trigger state transition to CRASHED FIRST (before notifying listeners)
+    // This ensures the state is CRASHED when handleCrashReplayTrigger runs
+    if (this.stateTransitionCallback) {
+      this.stateTransitionCallback(GameState.CRASHED);
+    }
+
+    // THEN notify replay trigger listeners
+    // At this point, state is CRASHED and listeners can set up the replay
     this.replayTriggerListeners.forEach(listener => {
       try {
         listener(crashEvent);
@@ -661,11 +668,6 @@ export class CrashManager {
         console.error('Error in replay trigger listener:', error);
       }
     });
-
-    // Trigger state transition to CRASHED
-    if (this.stateTransitionCallback) {
-      this.stateTransitionCallback(GameState.CRASHED);
-    }
   }
 
   /**

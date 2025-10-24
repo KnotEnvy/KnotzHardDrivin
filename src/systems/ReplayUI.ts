@@ -51,7 +51,11 @@ export class ReplayUI {
   private titleElement: HTMLElement;
   private progressBar: HTMLProgressElement;
   private skipButton: HTMLButtonElement;
+  private retryButton: HTMLButtonElement;
+  private menuButton: HTMLButtonElement;
   private skipCallbacks: Array<() => void> = [];
+  private retryCallbacks: Array<() => void> = [];
+  private menuCallbacks: Array<() => void> = [];
 
   /**
    * Creates a new ReplayUI instance.
@@ -65,6 +69,8 @@ export class ReplayUI {
     this.titleElement = this.container.querySelector('.replay-title') as HTMLElement;
     this.progressBar = this.container.querySelector('.replay-progress') as HTMLProgressElement;
     this.skipButton = this.container.querySelector('.skip-button') as HTMLButtonElement;
+    this.retryButton = this.container.querySelector('.retry-button') as HTMLButtonElement;
+    this.menuButton = this.container.querySelector('.menu-button') as HTMLButtonElement;
 
     this.attachEventListeners();
 
@@ -101,6 +107,10 @@ export class ReplayUI {
         <div class="replay-title">CRASH REPLAY</div>
         <progress class="replay-progress" value="0" max="10"></progress>
         <button class="skip-button">SKIP (Enter)</button>
+        <div class="button-row">
+          <button class="retry-button">RETRY RACE (R)</button>
+          <button class="menu-button">MAIN MENU (Esc)</button>
+        </div>
       </div>
     `;
 
@@ -112,13 +122,26 @@ export class ReplayUI {
    *
    * Listeners:
    * - Click: Skip button triggers skip sequence
+   * - Click: Retry button restarts race from beginning
+   * - Click: Menu button returns to main menu
    * - Keydown (Enter): Keyboard shortcut to skip
-   * - Keydown (Escape): Alternative way to skip (optional)
+   * - Keydown (R): Keyboard shortcut to retry
+   * - Keydown (Escape): Keyboard shortcut to return to menu
    */
   private attachEventListeners(): void {
     // Skip button click
     this.skipButton.addEventListener('click', () => {
       this.onSkipButtonClicked();
+    });
+
+    // Retry button click
+    this.retryButton.addEventListener('click', () => {
+      this.onRetryButtonClicked();
+    });
+
+    // Menu button click
+    this.menuButton.addEventListener('click', () => {
+      this.onMenuButtonClicked();
     });
 
     // Keyboard shortcuts
@@ -131,6 +154,12 @@ export class ReplayUI {
       if (e.code === 'Enter' || e.key === 'Enter') {
         e.preventDefault();
         this.onSkipButtonClicked();
+      } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        this.onRetryButtonClicked();
+      } else if (e.code === 'Escape' || e.key === 'Escape') {
+        e.preventDefault();
+        this.onMenuButtonClicked();
       }
     };
 
@@ -154,6 +183,44 @@ export class ReplayUI {
 
     // Trigger callbacks
     this.skipCallbacks.forEach(callback => callback());
+  }
+
+  /**
+   * Handles retry button activation.
+   *
+   * Triggers all registered retry callbacks.
+   * Called by: button click, R key press
+   */
+  private onRetryButtonClicked(): void {
+    console.log('Replay retry triggered - restarting race');
+
+    // Add visual feedback
+    this.retryButton.classList.add('pressed');
+    setTimeout(() => {
+      this.retryButton.classList.remove('pressed');
+    }, 100);
+
+    // Trigger callbacks
+    this.retryCallbacks.forEach(callback => callback());
+  }
+
+  /**
+   * Handles menu button activation.
+   *
+   * Triggers all registered menu callbacks.
+   * Called by: button click, Esc key press
+   */
+  private onMenuButtonClicked(): void {
+    console.log('Replay menu triggered - returning to main menu');
+
+    // Add visual feedback
+    this.menuButton.classList.add('pressed');
+    setTimeout(() => {
+      this.menuButton.classList.remove('pressed');
+    }, 100);
+
+    // Trigger callbacks
+    this.menuCallbacks.forEach(callback => callback());
   }
 
   /**
@@ -270,6 +337,46 @@ export class ReplayUI {
   }
 
   /**
+   * Registers a callback to be called when player clicks Retry Race.
+   *
+   * Multiple callbacks can be registered and all will be called.
+   * Typically used by GameEngine to restart the race from the beginning.
+   *
+   * @param callback - Function to call when retry is triggered
+   *
+   * @example
+   * ```typescript
+   * replayUI.onRetry(() => {
+   *   console.log('Player wants to retry race');
+   *   GameEngine.getInstance().retryRace();
+   * });
+   * ```
+   */
+  onRetry(callback: () => void): void {
+    this.retryCallbacks.push(callback);
+  }
+
+  /**
+   * Registers a callback to be called when player clicks Main Menu.
+   *
+   * Multiple callbacks can be registered and all will be called.
+   * Typically used by GameEngine to transition back to main menu.
+   *
+   * @param callback - Function to call when menu is triggered
+   *
+   * @example
+   * ```typescript
+   * replayUI.onMenu(() => {
+   *   console.log('Player wants to return to main menu');
+   *   GameEngine.getInstance().returnToMenu();
+   * });
+   * ```
+   */
+  onMenu(callback: () => void): void {
+    this.menuCallbacks.push(callback);
+  }
+
+  /**
    * Gets the visibility state of the replay UI.
    *
    * @returns true if UI is currently shown, false otherwise
@@ -327,6 +434,8 @@ export class ReplayUI {
 
     // Clear callbacks
     this.skipCallbacks = [];
+    this.retryCallbacks = [];
+    this.menuCallbacks = [];
 
     console.log('ReplayUI disposed');
   }

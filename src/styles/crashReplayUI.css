@@ -1,0 +1,448 @@
+/**
+ * CrashReplayUI Styles - Control buttons for crash replay
+ *
+ * Design:
+ * - Retro-futuristic arcade aesthetic (matches game theme)
+ * - Magenta (#ff00ff) primary color for "Retry" button
+ * - Cyan (#00ffff) secondary color for "Menu" button
+ * - Monospace font for authentic arcade feel
+ * - Bottom-right corner positioning
+ * - Smooth animations and transitions
+ *
+ * Performance:
+ * - Uses CSS transforms for animations (GPU-accelerated)
+ * - No expensive blur filters in hot path
+ * - Z-index management to layer properly
+ * - Appears above ReplayUI but below modals
+ *
+ * Accessibility:
+ * - High contrast text (light on dark background)
+ * - Focus indicators for keyboard navigation
+ * - Reduced motion support via prefers-reduced-motion
+ * - Large touch targets (48px minimum)
+ * - Clear button labels with keyboard hints
+ */
+
+/* Container - Fixed overlay covering entire viewport */
+.crash-replay-ui-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999; /* Below ReplayUI (1000) but above game HUD */
+
+  pointer-events: none; /* Don't block clicks when hidden */
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Show state - make visible and interactive */
+.crash-replay-ui-container.visible {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* Controls panel - Bottom-right positioning */
+.crash-replay-controls {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+
+  /* Stack buttons vertically */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  /* Sizing */
+  min-width: 200px;
+  max-width: 250px;
+
+  /* Entrance animation */
+  animation: controlsSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Slide-in animation from bottom-right */
+@keyframes controlsSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(50px, 50px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+/* Base button styles */
+.crash-replay-retry-button,
+.crash-replay-menu-button {
+  /* Layout */
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 4px;
+
+  /* Typography */
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  /* Interactive feedback */
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Focus visible indicator for accessibility */
+  position: relative;
+}
+
+/* Retry button - Magenta primary action */
+.crash-replay-retry-button {
+  color: #1a1a2e;
+  background: linear-gradient(
+    135deg,
+    #ff00ff 0%,
+    #cc0099 100%
+  );
+
+  box-shadow:
+    0 4px 12px rgba(255, 0, 255, 0.4),
+    0 0 10px rgba(255, 0, 255, 0.2);
+}
+
+/* Retry button - Hover state */
+.crash-replay-retry-button:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    #ff33ff 0%,
+    #dd00aa 100%
+  );
+
+  box-shadow:
+    0 6px 16px rgba(255, 0, 255, 0.6),
+    0 0 20px rgba(255, 0, 255, 0.3);
+
+  transform: translateY(-2px);
+}
+
+/* Retry button - Focus state */
+.crash-replay-retry-button:focus-visible {
+  outline: 3px solid #00ffff;
+  outline-offset: 2px;
+}
+
+/* Retry button - Active/pressed state */
+.crash-replay-retry-button:active:not(:disabled),
+.crash-replay-retry-button.pressed {
+  background: linear-gradient(
+    135deg,
+    #dd00cc 0%,
+    #bb0088 100%
+  );
+
+  box-shadow:
+    0 2px 8px rgba(255, 0, 255, 0.4),
+    inset 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  transform: translateY(0);
+}
+
+/* Menu button - Cyan secondary action */
+.crash-replay-menu-button {
+  color: #1a1a2e;
+  background: linear-gradient(
+    135deg,
+    #00ffff 0%,
+    #00cc99 100%
+  );
+
+  box-shadow:
+    0 4px 12px rgba(0, 255, 255, 0.4),
+    0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+/* Menu button - Hover state */
+.crash-replay-menu-button:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    #00ffff 0%,
+    #00ff99 100%
+  );
+
+  box-shadow:
+    0 6px 16px rgba(0, 255, 255, 0.6),
+    0 0 20px rgba(0, 255, 255, 0.3);
+
+  transform: translateY(-2px);
+}
+
+/* Menu button - Focus state */
+.crash-replay-menu-button:focus-visible {
+  outline: 3px solid #ff00ff;
+  outline-offset: 2px;
+}
+
+/* Menu button - Active/pressed state */
+.crash-replay-menu-button:active:not(:disabled),
+.crash-replay-menu-button.pressed {
+  background: linear-gradient(
+    135deg,
+    #00dd88 0%,
+    #00aa77 100%
+  );
+
+  box-shadow:
+    0 2px 8px rgba(0, 255, 255, 0.4),
+    inset 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  transform: translateY(0);
+}
+
+/* Disabled state for both buttons */
+.crash-replay-retry-button:disabled,
+.crash-replay-menu-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Button text and hint styling */
+.button-text {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: bold;
+}
+
+.button-hint {
+  display: block;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 0px;
+  opacity: 0.85;
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .crash-replay-ui-container {
+    transition: opacity 0.1s linear;
+  }
+
+  .crash-replay-controls {
+    animation: none;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    transition: none;
+  }
+}
+
+/* Responsive: Tablet and medium screens */
+@media (max-width: 1024px) {
+  .crash-replay-controls {
+    bottom: 30px;
+    right: 30px;
+    min-width: 180px;
+    max-width: 220px;
+    gap: 10px;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .button-hint {
+    font-size: 10px;
+  }
+}
+
+/* Responsive: Mobile and small screens */
+@media (max-width: 768px) {
+  .crash-replay-controls {
+    bottom: 20px;
+    right: 20px;
+    min-width: 160px;
+    max-width: 200px;
+    gap: 8px;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    padding: 10px 12px;
+    font-size: 12px;
+    letter-spacing: 0px;
+    min-height: 44px; /* Touch target minimum */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .button-text {
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
+
+  .button-hint {
+    font-size: 9px;
+  }
+}
+
+/* Responsive: Extra small screens (phones in portrait) */
+@media (max-width: 480px) {
+  .crash-replay-controls {
+    bottom: 16px;
+    right: 16px;
+    min-width: 140px;
+    max-width: 180px;
+    gap: 6px;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 44px; /* Maintain touch target */
+    border-radius: 3px;
+  }
+
+  .button-text {
+    font-size: 11px;
+    margin-bottom: 1px;
+  }
+
+  .button-hint {
+    font-size: 8px;
+  }
+
+  .crash-replay-controls {
+    animation: controlsSlideInMobile 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes controlsSlideInMobile {
+    from {
+      opacity: 0;
+      transform: translate(20px, 20px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(0, 0);
+    }
+  }
+}
+
+/* Landscape orientation optimization */
+@media (max-height: 600px) and (orientation: landscape) {
+  .crash-replay-controls {
+    bottom: 20px;
+    right: 20px;
+    flex-direction: row; /* Horizontal layout for landscape */
+    min-width: auto;
+    gap: 8px;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    min-width: 140px;
+    padding: 8px 12px;
+  }
+}
+
+/* Extremely small height (very short landscape) */
+@media (max-height: 400px) {
+  .crash-replay-controls {
+    bottom: 10px;
+    right: 10px;
+  }
+
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+
+  .button-text {
+    font-size: 10px;
+    margin-bottom: 0px;
+  }
+
+  .button-hint {
+    font-size: 7px;
+    display: none; /* Hide hints on very small screens */
+  }
+}
+
+/* Dark theme (default, no change needed) */
+/* High DPI displays */
+@media (min-resolution: 192dpi) {
+  .crash-replay-retry-button,
+  .crash-replay-menu-button {
+    border: 1px solid transparent;
+  }
+}
+
+/* Prefers light color scheme */
+@media (prefers-color-scheme: light) {
+  .crash-replay-retry-button {
+    color: #ffffff;
+    background: linear-gradient(
+      135deg,
+      #dd0099 0%,
+      #bb0077 100%
+    );
+
+    box-shadow:
+      0 4px 12px rgba(221, 0, 153, 0.4),
+      0 0 10px rgba(221, 0, 153, 0.2);
+  }
+
+  .crash-replay-retry-button:hover:not(:disabled) {
+    background: linear-gradient(
+      135deg,
+      #ee00aa 0%,
+      #cc0088 100%
+    );
+
+    box-shadow:
+      0 6px 16px rgba(221, 0, 153, 0.6),
+      0 0 20px rgba(221, 0, 153, 0.3);
+  }
+
+  .crash-replay-menu-button {
+    color: #ffffff;
+    background: linear-gradient(
+      135deg,
+      #0088cc 0%,
+      #0066aa 100%
+    );
+
+    box-shadow:
+      0 4px 12px rgba(0, 136, 204, 0.4),
+      0 0 10px rgba(0, 136, 204, 0.2);
+  }
+
+  .crash-replay-menu-button:hover:not(:disabled) {
+    background: linear-gradient(
+      135deg,
+      #0099dd 0%,
+      #0077bb 100%
+    );
+
+    box-shadow:
+      0 6px 16px rgba(0, 136, 204, 0.6),
+      0 0 20px rgba(0, 136, 204, 0.3);
+  }
+
+  .crash-replay-retry-button:focus-visible {
+    outline-color: #0088cc;
+  }
+
+  .crash-replay-menu-button:focus-visible {
+    outline-color: #dd0099;
+  }
+}
