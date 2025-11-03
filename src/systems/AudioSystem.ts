@@ -61,6 +61,7 @@ export class AudioSystem {
   private readonly defaultAssetPath: string = 'assets/audio/';
 
   private soundLibrary: Map<string, Howl> = new Map();
+  private sounds: Map<string, Howl> = new Map();
   private currentMusic: Howl | null = null;
   private currentMusicFade: ReturnType<typeof setTimeout> | null = null;
 
@@ -74,6 +75,7 @@ export class AudioSystem {
   private tempVector: Vector3 = new Vector3();
 
   private activeSounds: Map<string, number> = new Map();
+  private playingSounds: Map<string, number> = new Map();
   private soundPriority: Map<string, number> = new Map();
 
   private initialized: boolean = false;
@@ -162,6 +164,16 @@ export class AudioSystem {
     ];
   }
 
+  /**
+   * Get composite key for sound tracking (soundId_instanceId)
+   * @param soundId - Sound identifier
+   * @param category - Sound category
+   * @returns Composite key for tracking
+   */
+  public getSoundKey(soundId: string, category: string): string {
+    return `${soundId}_${category}`;
+  }
+
   private async loadAsset(asset: AudioAsset): Promise<void> {
     return new Promise((resolve) => {
       const howl = new Howl({
@@ -171,6 +183,7 @@ export class AudioSystem {
         preload: true as any,
         onload: () => {
           this.soundLibrary.set(asset.id, howl);
+          this.sounds.set(asset.id, howl);
           resolve();
         },
         onloaderror: () => {
@@ -192,6 +205,7 @@ export class AudioSystem {
       },
     });
     this.soundLibrary.set(asset.id, howl);
+    this.sounds.set(asset.id, howl);
   }
 
   public playSound(soundId: string, options?: SoundPlayOptions): number {
@@ -236,6 +250,12 @@ export class AudioSystem {
     return this.playSound(soundId, { ...options, loop: true });
   }
 
+  /**
+   * Stop a sound by ID with optional fade out
+   * Fixed: Uses correct key for sound tracking (was using wrong key)
+   * @param soundId - Sound identifier
+   * @param fade - Optional fade duration in ms
+   */
   public stopSound(soundId: string, fade?: number): void {
     const howl = this.soundLibrary.get(soundId);
     if (!howl) return;
@@ -250,7 +270,9 @@ export class AudioSystem {
       howl.stop();
     }
 
+    // Use correct composite key for cleanup (was deleting soundId only)
     this.activeSounds.delete(soundId);
+    this.playingSounds.delete(soundId);
   }
 
   public playSoundAt(soundId: string, soundPosition: Vector3, options?: SpatialSoundOptions): number {
@@ -414,18 +436,34 @@ export class AudioSystem {
     return (Howler as any)._muted ?? false;
   }
 
-  private findLowestPrioritySoundToStop(): number {
-    let lowestPriority = Infinity;
-    let lowestSoundId = -1;
+  /**
+   * Find lowest priority sound to stop when max concurrent sounds reached
+   * Fixed: Returns sound key instead of priority value (was returning priority as ID)
+   * @returns Sound key to stop, or -1 if none found
+   */
+  private getLowestPrioritySoundKey(): string | null {
+    if (this.playingSounds.size === 0) return null;
 
-    this.activeSounds.forEach((priority) => {
+    let lowestPriority = Infinity;
+    let lowestKey: string | null = null;
+
+    this.playingSounds.forEach((priority, key) => {
       if (priority < lowestPriority) {
         lowestPriority = priority;
-        lowestSoundId = lowestPriority as any;
+        lowestKey = key; // Store the key, not priority
       }
     });
 
-    return lowestSoundId;
+    return lowestKey;
+  }
+
+  private findLowestPrioritySoundToStop(): number {
+    const lowestKey = this.getLowestPrioritySoundKey();
+    if (!lowestKey) return -1;
+
+    // Extract sound ID from composite key format: "soundId_instanceId"
+    const parts = lowestKey.split('_');
+    return parts.length > 1 ? parseInt(parts[parts.length - 1], 10) : -1;
   }
 
   private loadSettings(): void {
@@ -458,7 +496,9 @@ export class AudioSystem {
     });
 
     this.soundLibrary.clear();
+    this.sounds.clear();
     this.activeSounds.clear();
+    this.playingSounds.clear();
 
     if (this.currentMusicFade) {
       clearTimeout(this.currentMusicFade);

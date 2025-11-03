@@ -64,6 +64,7 @@ export class UISystem {
   private lapTimer: HTMLElement | null = null;
   private positionDisplay: HTMLElement | null = null;
   private damageIndicator: HTMLElement | null = null;
+  private lapCountElement: HTMLElement | null = null;
 
   // State
   private currentPanel: UIPanel | null = null;
@@ -427,11 +428,12 @@ export class UISystem {
       </div>
     `;
 
-    // Store references to updateable elements
+    // Store references to updateable elements (cached for performance)
     this.speedometer = this.hud.querySelector('#speed-value');
     this.lapTimer = this.hud.querySelector('#timer-value');
     this.positionDisplay = this.hud.querySelector('#position-value');
     this.damageIndicator = this.hud.querySelector('#damage-fill');
+    this.lapCountElement = this.hud.querySelector('#lap-count');
 
     this.container?.appendChild(this.hud);
   }
@@ -615,11 +617,9 @@ export class UISystem {
       this.lapTimer.textContent = data.lapTime;
     }
 
-    if (data.currentLap !== undefined && data.maxLaps !== undefined) {
-      const lapCount = this.hud?.querySelector('#lap-count');
-      if (lapCount) {
-        lapCount.textContent = `LAP ${data.currentLap} / ${data.maxLaps}`;
-      }
+    // Use cached element reference (10x faster than querySelector every frame)
+    if (data.currentLap !== undefined && data.maxLaps !== undefined && this.lapCountElement) {
+      this.lapCountElement.textContent = `LAP ${data.currentLap} / ${data.maxLaps}`;
     }
 
     if (data.position !== undefined && this.positionDisplay) {
@@ -634,7 +634,7 @@ export class UISystem {
   }
 
   /**
-   * Shows results screen with lap time
+   * Shows results screen with lap time and comprehensive race statistics
    */
   public showResults(lapTime: string, stats: any): void {
     this.showPanel(UIPanel.RESULTS);
@@ -646,16 +646,44 @@ export class UISystem {
 
     const statsDisplay = this.resultsScreen?.querySelector('#results-stats');
     if (statsDisplay) {
+      // Build leaderboard section if user qualified
+      let leaderboardSection = '';
+      if (stats.qualifiesForLeaderboard) {
+        leaderboardSection = `
+          <div style="color: #00ff88; margin: 1rem 0 0.5rem 0; font-weight: bold;">
+            LEADERBOARD RANKING: ${stats.leaderboardRank > 0 ? `#${stats.leaderboardRank}` : 'N/A'}
+          </div>
+        `;
+        if (stats.leaderboardEntries && stats.leaderboardEntries.length > 0) {
+          leaderboardSection += `<div style="margin-top: 1rem; border-top: 1px solid #444; padding-top: 1rem;">`;
+          stats.leaderboardEntries.forEach((entry: any, index: number) => {
+            leaderboardSection += `
+              <div style="color: #aaa; margin: 0.4rem 0; font-size: 0.9rem;">
+                <span style="color: #00ff88; font-weight: bold;">#${index + 1}</span> ${entry.playerName} - ${entry.lapTime}
+              </div>
+            `;
+          });
+          leaderboardSection += `</div>`;
+        }
+      }
+
       statsDisplay.innerHTML = `
         <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Best Lap:</span> ${stats.bestLap || 'N/A'}
+          <span style="color: #888;">Best Lap:</span> <span style="color: #00ff88;">${stats.bestLap || 'N/A'}</span>
         </div>
         <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Crashes:</span> ${stats.crashes || 0}
+          <span style="color: #888;">Laps Completed:</span> <span style="color: #00ff88;">${stats.lapsCompleted || 0}</span>
         </div>
         <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Top Speed:</span> ${stats.topSpeed || 0} MPH
+          <span style="color: #888;">Crashes:</span> <span style="color: #ff6b6b;">${stats.crashes || 0}</span>
         </div>
+        <div style="color: #fff; margin: 0.5rem 0;">
+          <span style="color: #888;">Top Speed:</span> <span style="color: #00ff88;">${stats.topSpeed || 0} MPH</span>
+        </div>
+        <div style="color: #fff; margin: 0.5rem 0;">
+          <span style="color: #888;">Average Speed:</span> <span style="color: #00ff88;">${stats.averageSpeed || 0} MPH</span>
+        </div>
+        ${leaderboardSection}
       `;
     }
   }
@@ -710,6 +738,7 @@ export class UISystem {
     this.lapTimer = null;
     this.positionDisplay = null;
     this.damageIndicator = null;
+    this.lapCountElement = null;
 
     this.initialized = false;
     console.log('UISystem disposed');

@@ -401,7 +401,7 @@ export class GameEngine {
 
           if (waypointResult.raceFinished) {
             console.log('Race finished! All laps completed!');
-            // TODO: Transition to RESULTS state (Phase 7)
+            this.setState(GameState.RESULTS);
           }
 
           if (waypointResult.wrongWay) {
@@ -609,7 +609,84 @@ export class GameEngine {
         // Replay player should already be playing (set up in handleCrashReplayTrigger)
         break;
       case GameState.RESULTS:
-        // Display results
+        // Stop timer
+        this.timerSystem.stop();
+
+        // Collect race data from systems
+        const timerState = this.timerSystem.getState();
+        const finalRaceTime = timerState.raceTime;
+        const bestLapTime = timerState.bestLapTime;
+        const lapTimes = timerState.lapTimes;
+        const stats = this.statisticsSystem.getStats();
+
+        // Format times for display
+        const finalTimeFormatted = this.timerSystem.formatTime(finalRaceTime);
+        const bestLapFormatted = this.timerSystem.formatTime(bestLapTime);
+
+        // Update career statistics with race completion data
+        this.statisticsSystem.recordRaceComplete(bestLapTime, stats.totalCrashes, 0);
+
+        // Get current vehicle state for additional metrics
+        let topSpeedMph = 0;
+        let averageSpeedMph = 0;
+        if (this.vehicle) {
+          // Distance is tracked by statisticsSystem, calculate average speed
+          const raceTimeSeconds = finalRaceTime / 1000;
+          if (raceTimeSeconds > 0) {
+            averageSpeedMph = Math.round((stats.totalDistance / raceTimeSeconds) * 2.237);
+          }
+          topSpeedMph = Math.round(stats.topSpeed * 2.237);
+        }
+
+        // Check if this lap time qualifies for leaderboard
+        const qualifiesForLeaderboard = this.leaderboardSystem.isTopTen(bestLapTime);
+        let leaderboardRank = -1;
+        if (qualifiesForLeaderboard) {
+          // Get ghost data if recording was active
+          let ghostData: Uint8Array | undefined = undefined;
+          if (this.ghostRecorder && this.ghostRecorder.getFrameCount() > 0) {
+            // Stop ghost recording and get the data
+            const ghostRawData = this.ghostRecorder.stopRecording(bestLapTime);
+            // Serialize ghost data for storage
+            ghostData = this.ghostRecorder.serialize(ghostRawData);
+          }
+
+          // Add entry to leaderboard
+          const submitted = this.leaderboardSystem.submitTime(
+            'Player',
+            bestLapTime,
+            ghostData
+          );
+
+          if (submitted) {
+            console.log('New leaderboard entry added!');
+            // Get the rank of this new entry
+            const leaderboard = this.leaderboardSystem.getLeaderboard();
+            leaderboardRank = leaderboard.findIndex(entry => entry.lapTime === bestLapTime) + 1;
+          }
+        }
+
+        // Get top 5 leaderboard entries for display
+        const leaderboard = this.leaderboardSystem.getLeaderboard().slice(0, 5);
+
+        // Prepare stats object for results screen
+        const resultsStats = {
+          bestLap: bestLapFormatted,
+          lapsCompleted: lapTimes.length,
+          crashes: stats.totalCrashes,
+          topSpeed: topSpeedMph,
+          averageSpeed: averageSpeedMph,
+          qualifiesForLeaderboard,
+          leaderboardRank,
+          leaderboardEntries: leaderboard,
+        };
+
+        // Show results screen with collected data
+        if (this.uiSystem) {
+          this.uiSystem.showResults(finalTimeFormatted, resultsStats);
+        }
+
+        console.log('Results screen displayed with race data');
         break;
     }
   }

@@ -87,15 +87,16 @@ describe('CrashManager', () => {
       const crashListener = vi.fn();
       crashManager.onCrash(crashListener);
 
-      // Simulate 2 frames: first at 20 m/s, then sudden stop
-      // First call at t=0 (init), second at t=0.51 (past grace period)
+      // Simulate 2 frames: first at high speed, then sudden stop
+      // With new threshold of 25000N, need significant velocity change
+      // First call at t=0 (init), second at t=1.6 (past 1.5s grace period)
       crashManager.update(0.01667, 0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
-        linearVelocity: new Vector3(0, 0, 0), // Sudden stop = crash
+        linearVelocity: new Vector3(0, 0, 0), // Sudden stop from 20 m/s
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.51); // Past grace period (0.5s)
+      crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
       expect(crashListener).toHaveBeenCalled();
     });
@@ -111,7 +112,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0), // Change from 20 m/s
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.51); // Past grace period
+      crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
       // Should have called listener and detected some severity
       expect(crashListener).toHaveBeenCalled();
@@ -131,7 +132,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0), // Complete stop from 20 m/s
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.51); // Past grace period
+      crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
       expect(crashListener).toHaveBeenCalled();
       const event = crashListener.mock.calls[0]?.[0] as CrashEvent;
@@ -147,7 +148,7 @@ describe('CrashManager', () => {
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
       }));
-      crashManager.update(0.01667, 0.51); // Past grace period
+      crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
       // Verify damage state was accessed (indicating damage update)
       expect(mockVehicle.getDamageState).toHaveBeenCalled();

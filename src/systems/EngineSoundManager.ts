@@ -42,6 +42,9 @@ export class EngineSoundManager {
   private audioSystem: AudioSystem;
 
   // Engine sound state
+  private engineIdleId: string = 'engine_idle';
+  private engineLowId: string = 'engine_rev';
+  private engineHighId: string = 'engine_rev';
   private currentIdleSoundId: number = -1;
   private currentRevSoundId: number = -1;
   private idleVolume: number = 0;
@@ -258,7 +261,7 @@ export class EngineSoundManager {
 
   /**
    * Update sound properties (volume and pitch)
-   * Handles Howler.js audio parameter updates
+   * Handles Howler.js audio parameter updates for engine sounds
    *
    * @param soundId - Sound identifier
    * @param howlId - Howler sound instance ID
@@ -266,12 +269,17 @@ export class EngineSoundManager {
    * @param pitch - Target pitch multiplier
    */
   private updateSoundProperties(soundId: string, howlId: number, volume: number, pitch: number): void {
-    // In practice, Howler stores these globally per sound
-    // We would need to access the Howler instance directly via private AudioSystem methods
-    // For now, this is a placeholder that would be enhanced with direct Howler integration
+    const howl = (this.audioSystem as any).sounds.get(soundId);
+    if (!howl) return;
 
-    // Note: Direct per-instance volume/pitch updates require accessing Howler internals
-    // This would be implemented in the AudioSystem with additional helper methods
+    // Update volume and pitch on the Howler instance
+    // Note: Howler applies these globally per sound definition
+    try {
+      howl.volume(volume);
+      howl.rate(pitch);
+    } catch (error) {
+      console.warn(`Failed to update sound properties for ${soundId}:`, error);
+    }
   }
 
   /**
