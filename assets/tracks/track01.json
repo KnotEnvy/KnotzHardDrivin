@@ -21,65 +21,6 @@
       "angle": 90
     }
   ],
-  "waypoints": [
-    {
-      "id": 0,
-      "position": [0, 0.2, 10],
-      "direction": [0, 0, 1],
-      "triggerRadius": 12,
-      "isCheckpoint": true,
-      "timeBonus": 30
-    },
-    {
-      "id": 1,
-      "position": [0, 0.2, 120],
-      "direction": [0, 0, 1],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 2,
-      "position": [50, 0.2, 170],
-      "direction": [1, 0, 0],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 3,
-      "position": [100, 0.2, 170],
-      "direction": [1, 0, 0],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 4,
-      "position": [150, 0.2, 120],
-      "direction": [0, 0, -1],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 5,
-      "position": [150, 0.2, 10],
-      "direction": [0, 0, -1],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 6,
-      "position": [100, 0.2, 40],
-      "direction": [-1, 0, 0],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    },
-    {
-      "id": 7,
-      "position": [50, 0.2, 40],
-      "direction": [-1, 0, 0],
-      "triggerRadius": 12,
-      "isCheckpoint": false
-    }
-  ],
   "spawnPoint": {
     "position": [0, 2, 5],
     "rotation": [0, 0, 0, 1]

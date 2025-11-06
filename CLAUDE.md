@@ -756,12 +756,12 @@ You're joining a **fully playable and E2E-validated game with crash detection, c
 **Your Mission**: Build the UI/HUD system and ghost car integration that transform the game into a polished, production-ready experience with visual feedback and immersive sound.
 
 **Keys to Success**:
-1. Read PRD.md Section 4.5-4.6 before coding
+1. Read PRD.md Section 4+ before coding
 3. Test early and often (>80% coverage)
 4. Profile performance (UI rendering <2ms, maintain 60fps)
 5. Clean DOM management (no memory leaks)
 6. Responsive design for different screen sizes
-7. Document as you go
+7. Document at the end once the session is complete
 
 **What's Already Working**:
 - Complete game engine with fixed timestep loop (60fps physics)

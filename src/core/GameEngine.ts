@@ -1140,12 +1140,13 @@ export class GameEngine {
 
       const data: TrackData = await response.json();
 
-      // Validate required fields
-      if (!data.name || !data.sections || !data.waypoints || !data.spawnPoint) {
+      // Validate required fields (waypoints are now optional - auto-generated if missing)
+      if (!data.name || !data.sections || !data.spawnPoint) {
         throw new Error('Invalid track data: missing required fields');
       }
 
-      console.log(`Track data loaded: ${data.name} (${data.sections.length} sections, ${data.waypoints.length} waypoints)`);
+      const waypointCount = data.waypoints ? data.waypoints.length : 'auto-generated';
+      console.log(`Track data loaded: ${data.name} (${data.sections.length} sections, ${waypointCount} waypoints)`);
       return data;
     } catch (error) {
       console.error(`Error loading track data from ${path}:`, error);
@@ -1155,11 +1156,13 @@ export class GameEngine {
 
   /**
    * Converts track waypoint data to WaypointSystem format.
-   * @param trackData - Track data with waypoints as arrays
+   * Waypoints may be auto-generated if not provided in track data.
+   * @param trackData - Track data with waypoints (auto-generated if missing)
    * @returns Array of WaypointData with THREE.Vector3 objects
    */
   private convertWaypoints(trackData: TrackData): WaypointData[] {
-    return trackData.waypoints.map(wp => ({
+    const waypoints = trackData.waypoints || [];
+    return waypoints.map(wp => ({
       id: wp.id,
       position: new THREE.Vector3(wp.position[0], wp.position[1], wp.position[2]),
       direction: new THREE.Vector3(wp.direction[0], wp.direction[1], wp.direction[2]),
@@ -1235,7 +1238,16 @@ export class GameEngine {
       this.inputSystem = new InputSystem();
 
       // Convert waypoints and create waypoint system
-      const waypoints = this.convertWaypoints(trackData);
+      // Get waypoints from Track object (auto-generated if not in JSON)
+      const trackWaypoints = this.track.getWaypoints();
+      const waypoints = trackWaypoints.map(wp => ({
+        id: wp.id,
+        position: new THREE.Vector3(wp.position[0], wp.position[1], wp.position[2]),
+        direction: new THREE.Vector3(wp.direction[0], wp.direction[1], wp.direction[2]),
+        triggerRadius: wp.triggerRadius,
+        isCheckpoint: wp.isCheckpoint,
+        timeBonus: wp.timeBonus,
+      }));
       this.waypointSystem = new WaypointSystem(waypoints);
       this.waypointSystem.setMaxLaps(2); // Default: 2 laps
 

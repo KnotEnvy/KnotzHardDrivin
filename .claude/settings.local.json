@@ -45,7 +45,11 @@
       "Read(//tmp/chrome-devtools-mcp-IbH2n8/**)",
       "mcp__chrome-devtools__handle_dialog",
       "Read(//tmp/chrome-devtools-mcp-KVjIbM/**)",
-      "Bash(timeout 30 npm test)"
+      "Bash(timeout 30 npm test)",
+      "Bash(timeout 180 npm test -- Track)",
+      "Bash(timeout 30 npm run build:*)",
+      "mcp__chrome-devtools__get_console_message",
+      "Bash(timeout 300 npm test -- --run)"
     ],
     "deny": [],
     "ask": []

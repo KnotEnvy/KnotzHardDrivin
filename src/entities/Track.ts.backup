@@ -54,13 +54,12 @@ export interface ObstacleData {
 
 /**
  * Complete track data loaded from JSON.
- * Waypoints are now optional - they will be auto-generated from section boundaries if not provided.
  */
 export interface TrackData {
   name: string;
   sections: TrackSection[];
   width: number;
-  waypoints?: WaypointData[]; // Optional - auto-generated from section boundaries if not provided
+  waypoints: WaypointData[];
   spawnPoint: SpawnPointData;
   obstacles?: ObstacleData[];
 }
@@ -78,7 +77,6 @@ export class Track {
   private collider: RAPIER.Collider | null = null;
   private rigidBody: RAPIER.RigidBody | null = null; // Static rigid body for track
   private spline!: THREE.CatmullRomCurve3;
-  private controlPoints!: THREE.Vector3[]; // Control points used to generate the spline
   private trackData: TrackData;
   private physicsWorld: PhysicsWorld; // Store reference for cleanup
   private scene: THREE.Scene; // Store reference for obstacle cleanup
@@ -97,22 +95,14 @@ export class Track {
    * @param scene - Three.js scene to add visual mesh to
    */
   constructor(data: TrackData, world: PhysicsWorld, scene: THREE.Scene) {
+    this.trackData = data;
+    this.physicsWorld = world; // Store for cleanup
+    this.scene = scene; // Store for obstacle cleanup
+
     // Generate track geometry
     this.generateSpline(data.sections);
     this.mesh = this.generateMesh(data.width);
     this.generateCollider(world);
-
-    // Auto-generate waypoints if not provided
-    const waypoints = data.waypoints || this.generateWaypoints(data.sections);
-
-    // Store track data with generated waypoints
-    this.trackData = {
-      ...data,
-      waypoints,
-    };
-
-    this.physicsWorld = world; // Store for cleanup
-    this.scene = scene; // Store for obstacle cleanup
 
     // Add to scene
     scene.add(this.mesh);
@@ -120,7 +110,7 @@ export class Track {
     // Create obstacles
     this.createObstacles(data.obstacles, world, scene);
 
-    console.log(`Track "${this.trackData.name}" loaded: ${this.trackData.sections.length} sections, ${this.trackData.waypoints?.length || 0} waypoints, ${this.obstacles.length} obstacles`);
+    console.log(`Track "${data.name}" loaded: ${data.sections.length} sections, ${data.waypoints.length} waypoints, ${this.obstacles.length} obstacles`);
   }
 
   /**
@@ -166,9 +156,6 @@ export class Track {
       }
     }
 
-    // Store control points for later reference
-    this.controlPoints = points;
-
     // Create closed loop spline
     this.spline = new THREE.CatmullRomCurve3(points, true);
     console.log(`Spline generated with ${points.length} control points`);
@@ -188,25 +175,7 @@ export class Track {
     startDir: THREE.Vector3
   ): THREE.Vector3[] {
     const points: THREE.Vector3[] = [];
-
-    // Use appropriate divisions based on section type
-    // Straights need minimal points, curves need more for smoothness
-    let divisions: number;
-    switch (section.type) {
-      case 'straight':
-        divisions = 1; // Only start and end points for straight lines
-        break;
-      case 'curve':
-      case 'loop':
-      case 'bank':
-        divisions = 20; // Smooth curves need more points
-        break;
-      case 'ramp':
-        divisions = 5; // Ramps need a few points for elevation changes
-        break;
-      default:
-        divisions = 10;
-    }
+    const divisions = 20; // Points per section
 
     switch (section.type) {
       case 'straight': {
@@ -331,29 +300,12 @@ export class Track {
    * - Texture repeats approximately every 2 units of track distance
    * - No visible banding or seams at tessellation boundaries
    *
-   * Closed Loop Handling:
-   * - For closed loops, properly connects last segment back to first
-   * - Handles UV wrapping at seam to prevent visible discontinuities
-   * - Eliminates duplicate geometry at loop closure
-   *
    * @param width - Track width in meters
    * @returns THREE.Mesh ready for rendering
    */
   private generateMesh(width: number): THREE.Mesh {
     const geometry = new THREE.BufferGeometry();
-
-    // Calculate tessellation based on track complexity
-    // For simple tracks (like our oval), we don't need 1000 points
-    // Use control points as a guide: each control point gets interpolated
-    // Straights need minimal points, curves need more for smoothness
-    const controlPointCount = this.controlPoints.length;
-
-    // For a simple oval (43 control points), this gives ~129 points total
-    // For complex tracks with more control points, scales appropriately
-    const pointsPerControlPoint = 3; // Interpolate 3 points between each control point
-    const numPoints = Math.max(controlPointCount * pointsPerControlPoint, 100);
-
-    console.log(`Tessellating track: ${controlPointCount} control points → ${numPoints} mesh points`);
+    const numPoints = 1000; // High tessellation for smoothness
     const points = this.spline.getPoints(numPoints);
 
     const vertices: number[] = [];
@@ -372,14 +324,9 @@ export class Track {
     // Texture tiling: repeats texture every ~2 units for consistent appearance
     const textureScale = 2.0;
 
-    // Generate vertices for all spline points
-    // For closed loops, we'll handle the wraparound in the index generation
-    const numSegments = points.length - 1; // Don't create duplicate vertex at loop end
-
-    for (let i = 0; i < numSegments; i++) {
+    for (let i = 0; i < points.length; i++) {
       const point = points[i];
-      // Use normalized parameter that respects the actual segment count
-      const t = i / numSegments;
+      const t = i / (points.length - 1);
 
       // Get tangent (direction along track)
       const tangent = this.spline.getTangent(t);
@@ -401,10 +348,9 @@ export class Track {
       vertices.push(rightEdge.x, rightEdge.y, rightEdge.z);
 
       // Calculate UV coordinates using accumulated distance
-      // V: continuous distance-based coordinate that repeats smoothly
-      // Divide accumulated distance by textureScale to create regular tiling
-      // This creates texture repetition every textureScale units of track distance
-      const vCoord = distanceAccum[i] / textureScale;
+      // V: continuous coordinate along track using actual distance
+      // Dividing by textureScale creates regular repetition
+      const vCoord = (distanceAccum[i] / totalDistance) * (totalDistance / textureScale);
 
       // U: left edge at 0, right edge at 1 for proper width mapping
       uvs.push(0, vCoord); // Left edge
@@ -413,21 +359,17 @@ export class Track {
       // Add normals (pointing up)
       normals.push(0, 1, 0);
       normals.push(0, 1, 0);
-    }
 
-    // Generate indices to create triangle pairs
-    // For closed loops, the last segment wraps back to the first
-    for (let i = 0; i < numSegments; i++) {
-      const base = i * 2;
+      // Create triangles (skip last segment)
+      if (i < points.length - 1) {
+        const base = i * 2;
 
-      // Calculate indices for the next segment, wrapping around for closed loops
-      const nextBase = ((i + 1) % numSegments) * 2;
+        // First triangle
+        indices.push(base, base + 1, base + 2);
 
-      // First triangle (left edge of current, right edge of current, left edge of next)
-      indices.push(base, base + 1, nextBase);
-
-      // Second triangle (right edge of current, right edge of next, left edge of next)
-      indices.push(base + 1, nextBase + 1, nextBase);
+        // Second triangle
+        indices.push(base + 1, base + 3, base + 2);
+      }
     }
 
     // Set geometry attributes
@@ -452,7 +394,6 @@ export class Track {
       metalness: 0.05, // Less metalness for more diffuse lighting
       side: THREE.FrontSide, // Single-sided to prevent z-fighting
       flatShading: false, // Ensure smooth shading
-      wireframe: false, // Ensure filled geometry
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -519,109 +460,6 @@ export class Track {
   }
 
   /**
-   * Automatically generates waypoints from track section boundaries.
-   *
-   * Places one waypoint at the end of each section, calculated from the spline.
-   * The first waypoint is marked as a checkpoint with a time bonus.
-   * All waypoints have a trigger radius of 18 meters for an oval track.
-   *
-   * Waypoint generation process:
-   * 1. Calculate the cumulative length of each section (how far along the spline)
-   * 2. For each section end, find the spline parameter t that corresponds to that distance
-   * 3. Use spline.getPoint(t) to get the 3D position on the centerline
-   * 4. Use spline.getTangent(t) to get the forward direction at that point
-   * 5. Place waypoint at Y=0.5 (above track surface) with the calculated direction
-   *
-   * Performance: Computed once during track initialization, zero per-frame cost
-   *
-   * @param sections - Array of track section definitions
-   * @returns Array of generated WaypointData
-   */
-  private generateWaypoints(sections: TrackSection[]): WaypointData[] {
-    // First pass: calculate section boundaries and total track length
-    const sectionLengths: number[] = [];
-    const sectionStartDistances: number[] = [0];
-    let totalDistance = 0;
-
-    for (const section of sections) {
-      let sectionLength = 0;
-
-      switch (section.type) {
-        case 'straight':
-          sectionLength = section.length || 50;
-          break;
-        case 'curve': {
-          const radius = section.radius || 30;
-          const angle = ((section.angle || 90) * Math.PI) / 180;
-          sectionLength = radius * angle; // Arc length = radius * angle
-          break;
-        }
-        case 'ramp': {
-          const length = section.length || 30;
-          const height = section.height || 5;
-          // Arc length of ramp (approximation using Euclidean distance)
-          sectionLength = Math.sqrt(length * length + height * height);
-          break;
-        }
-        case 'loop': {
-          const loopRadius = section.radius || 15;
-          sectionLength = Math.PI * 2 * loopRadius; // Full circle circumference
-          break;
-        }
-        case 'bank': {
-          const radius = section.radius || 40;
-          const angle = ((section.angle || 90) * Math.PI) / 180;
-          sectionLength = radius * angle; // Arc length
-          break;
-        }
-        default:
-          sectionLength = 50;
-      }
-
-      sectionLengths.push(sectionLength);
-      totalDistance += sectionLength;
-      sectionStartDistances.push(totalDistance);
-    }
-
-    // Second pass: generate waypoints at section boundaries
-    const waypoints: WaypointData[] = [];
-
-    for (let i = 0; i < sections.length; i++) {
-      // Distance at the end of this section
-      const sectionEndDistance = sectionStartDistances[i + 1];
-
-      // Convert distance to spline parameter (0-1, where 1 is the full loop)
-      const t = sectionEndDistance / totalDistance;
-
-      // Clamp to valid range in case of floating point issues
-      const tClamped = Math.max(0, Math.min(1, t));
-
-      // Get position and direction from spline
-      const position = this.spline.getPoint(tClamped);
-      const tangent = this.spline.getTangent(tClamped);
-
-      // Normalize tangent to get direction
-      tangent.normalize();
-
-      // Create waypoint with position at Y=0.5 (above track surface)
-      const waypoint: WaypointData = {
-        id: i,
-        position: [position.x, 0.5, position.z],
-        direction: [tangent.x, 0, tangent.z],
-        triggerRadius: 18,
-        isCheckpoint: i === 0, // First waypoint is the checkpoint
-        timeBonus: i === 0 ? 30 : undefined,
-      };
-
-      waypoints.push(waypoint);
-    }
-
-    console.log(`Auto-generated ${waypoints.length} waypoints from ${sections.length} sections`);
-
-    return waypoints;
-  }
-
-  /**
    * Creates obstacles from track data.
    *
    * @param obstacleData - Array of obstacle configurations
@@ -672,12 +510,10 @@ export class Track {
   /**
    * Gets track waypoint data.
    *
-   * Returns auto-generated waypoints if none were provided in track data.
-   *
    * @returns Array of waypoint configurations
    */
   getWaypoints(): WaypointData[] {
-    return this.trackData.waypoints || [];
+    return this.trackData.waypoints;
   }
 
   /**
@@ -765,10 +601,6 @@ export class Track {
   /**
    * Loads track data from JSON file.
    *
-   * Waypoints are optional in the JSON file - they will be auto-generated from
-   * section boundaries if not provided. Only name, sections, and spawnPoint
-   * are required.
-   *
    * @param path - Path to track JSON file
    * @returns Promise resolving to TrackData
    */
@@ -782,9 +614,9 @@ export class Track {
 
       const data: TrackData = await response.json();
 
-      // Validate track data (waypoints optional, will be auto-generated if missing)
-      if (!data.name || !data.sections || !data.spawnPoint) {
-        throw new Error('Invalid track data: missing required fields (name, sections, spawnPoint)');
+      // Validate track data
+      if (!data.name || !data.sections || !data.waypoints || !data.spawnPoint) {
+        throw new Error('Invalid track data: missing required fields');
       }
 
       console.log(`Track data loaded from ${path}: ${data.name}`);
