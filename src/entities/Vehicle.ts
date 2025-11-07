@@ -417,6 +417,7 @@ export class Vehicle {
       wheel.angularVelocity = 0;
       wheel.slipRatio = 0;
       wheel.slipAngle = 0;
+      wheel.steeringAngle = 0; // FIX: Reset steering angle to center wheels
     }
 
     // Reset input
@@ -904,15 +905,22 @@ export class Vehicle {
       const config = this.config.wheels[i];
 
       if (config.isSteerable) {
-        // Smooth steering interpolation
-        const steeringSpeed = ADVANCED_TUNING.steeringSpeed * deltaTime;
-        wheel.steeringAngle = this.lerp(wheel.steeringAngle, targetSteeringAngle, steeringSpeed);
-
-        // Apply Ackermann steering (inner wheel steers more)
+        // Calculate per-wheel target with Ackermann steering
+        // FIX: Apply Ackermann to TARGET angle before lerping (prevents accumulation)
+        // Left turn (steering < 0): left wheel (i=0) is inner, should steer MORE
+        // Right turn (steering > 0): right wheel (i=1) is inner, should steer MORE
+        let wheelTargetAngle = targetSteeringAngle;
         if (Math.abs(this.input.steering) > 0.01) {
-          const ackermannFactor = i === 0 ? 1.0 + ADVANCED_TUNING.ackermannSteering * 0.1 : 1.0 - ADVANCED_TUNING.ackermannSteering * 0.1;
-          wheel.steeringAngle *= ackermannFactor;
+          const isInnerWheel = (this.input.steering < 0 && i === 0) || (this.input.steering > 0 && i === 1);
+          const ackermannFactor = isInnerWheel
+            ? 1.0 + ADVANCED_TUNING.ackermannSteering * 0.1  // Inner wheel steers more
+            : 1.0 - ADVANCED_TUNING.ackermannSteering * 0.1; // Outer wheel steers less
+          wheelTargetAngle *= ackermannFactor;
         }
+
+        // Smooth steering interpolation towards per-wheel target
+        const steeringSpeed = ADVANCED_TUNING.steeringSpeed * deltaTime;
+        wheel.steeringAngle = this.lerp(wheel.steeringAngle, wheelTargetAngle, steeringSpeed);
       }
     }
 

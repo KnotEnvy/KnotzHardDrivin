@@ -251,6 +251,29 @@ export class ReplayUI {
       this.container.classList.add('visible');
     });
 
+    // FIX: Auto-minimize UI after 2 seconds so user can watch the replay
+    setTimeout(() => {
+      if (this.isVisible()) {
+        // Hide the entire overlay - only the skip button will be visible
+        this.overlay.style.display = 'none';
+
+        // Move skip button to container level and position it in corner
+        this.container.appendChild(this.skipButton);
+        this.skipButton.style.fontSize = '12px';
+        this.skipButton.style.padding = '8px 16px';
+        this.skipButton.style.position = 'fixed';
+        this.skipButton.style.bottom = '20px';
+        this.skipButton.style.right = '20px';
+        this.skipButton.style.zIndex = '10000';
+        this.skipButton.style.background = 'rgba(0, 120, 215, 0.9)';
+        this.skipButton.style.border = '2px solid #00d4ff';
+        this.skipButton.style.color = 'white';
+        this.skipButton.style.cursor = 'pointer';
+        this.skipButton.style.borderRadius = '4px';
+        console.log('ReplayUI minimized - watching replay');
+      }
+    }, 2000);
+
     console.log('ReplayUI shown');
   }
 
@@ -273,6 +296,31 @@ export class ReplayUI {
    */
   hide(): void {
     this.container.classList.remove('visible');
+
+    // Restore UI to full state (in case it was minimized)
+    this.overlay.style.display = '';
+    this.overlay.style.background = '';
+    this.overlay.style.pointerEvents = '';
+    this.titleElement.style.display = '';
+    this.progressBar.style.display = '';
+    this.retryButton.style.display = '';
+    this.menuButton.style.display = '';
+
+    // Restore skip button to overlay (in case it was moved to container)
+    if (this.skipButton.parentElement !== this.overlay) {
+      this.overlay.appendChild(this.skipButton);
+    }
+    this.skipButton.style.fontSize = '';
+    this.skipButton.style.padding = '';
+    this.skipButton.style.position = '';
+    this.skipButton.style.bottom = '';
+    this.skipButton.style.right = '';
+    this.skipButton.style.zIndex = '';
+    this.skipButton.style.background = '';
+    this.skipButton.style.border = '';
+    this.skipButton.style.color = '';
+    this.skipButton.style.cursor = '';
+    this.skipButton.style.borderRadius = '';
 
     // Wait for fade-out animation to complete before hiding
     setTimeout(() => {

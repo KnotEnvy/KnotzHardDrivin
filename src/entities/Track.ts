@@ -133,7 +133,8 @@ export class Track {
    */
   private generateSpline(sections: TrackSection[]): void {
     const points: THREE.Vector3[] = [];
-    let currentPos = new THREE.Vector3(0, 0, 0);
+    // FIX: Elevate track 0.5m above ground to prevent clipping (ground is at Y=0)
+    let currentPos = new THREE.Vector3(0, 0.5, 0);
     let currentDir = new THREE.Vector3(0, 0, 1); // Start facing +Z
 
     for (const section of sections) {
@@ -516,6 +517,57 @@ export class Track {
     console.log(
       `Track collider created: ${vertices.length / 3} vertices, ${indices.length / 3} triangles, isSensor=${this.collider.isSensor()}, handle=${this.collider.handle}`
     );
+  }
+
+  /**
+   * Creates a debug visualization of the collision mesh.
+   * Renders the physics trimesh as a wireframe overlay to identify collision issues.
+   *
+   * @param scene - Three.js scene to add debug mesh to
+   * @returns Debug mesh (can be toggled on/off)
+   */
+  public createCollisionDebugMesh(scene: THREE.Scene): THREE.LineSegments {
+    console.log('[TRACK DEBUG] Creating collision debug visualization...');
+
+    if (!this.collider) {
+      throw new Error('Cannot create debug mesh - collider not initialized');
+    }
+
+    // Get the same geometry used for collision
+    const positionAttr = this.mesh.geometry.attributes.position;
+    const indexAttr = this.mesh.geometry.index;
+
+    if (!positionAttr || !indexAttr) {
+      throw new Error('Mesh missing attributes for debug visualization');
+    }
+
+    // Create wireframe geometry from the collision mesh
+    const wireframeGeometry = new THREE.BufferGeometry();
+    wireframeGeometry.setAttribute('position', positionAttr.clone());
+    wireframeGeometry.setIndex(indexAttr.clone());
+
+    // Create bright green wireframe material (easy to see)
+    const wireframeMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ff00, // Bright green
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: true,
+    });
+
+    // Create edges geometry for cleaner visualization
+    const edgesGeometry = new THREE.EdgesGeometry(wireframeGeometry, 15); // 15 degree threshold
+    const debugMesh = new THREE.LineSegments(edgesGeometry, wireframeMaterial);
+
+    // Offset slightly above track surface to avoid z-fighting
+    debugMesh.position.y = 0.05;
+    debugMesh.name = 'track-collision-debug';
+
+    scene.add(debugMesh);
+    console.log('[TRACK DEBUG] Collision debug mesh created and added to scene');
+    console.log(`[TRACK DEBUG] Collision mesh has ${positionAttr.count} vertices, ${indexAttr.count / 3} triangles`);
+
+    return debugMesh;
   }
 
   /**

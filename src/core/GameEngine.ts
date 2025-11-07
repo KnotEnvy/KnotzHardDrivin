@@ -295,8 +295,10 @@ export class GameEngine {
 
     console.log(`Replay triggered: ${frames.length} frames (${replayDuration.toFixed(1)}s), starting from ${replayStartTime.toFixed(1)}s`);
 
-    // Don't transition here - state will be CRASHED when this is called
-    // The CRASHED state's onStateEnter will transition to REPLAY
+    // FIX: Immediately transition to REPLAY state after setting up player
+    // Don't wait for next update() - this ensures replay starts immediately
+    console.log('[CRASH REPLAY FIX] Immediately transitioning to REPLAY state');
+    this.setState(GameState.REPLAY);
   }
 
   /**
@@ -436,19 +438,22 @@ export class GameEngine {
         }
         break;
       case GameState.CRASHED:
-        // Check if replay is ready and transition to REPLAY state
-        console.log('[CRASHED update] Checking for replayPlayer:', !!this.replayPlayer);
-        if (this.replayPlayer) {
-          console.log('=== CRASHED state - replay ready, transitioning to REPLAY ===');
-          this.setState(GameState.REPLAY);
-        } else {
-          console.log('[CRASHED update] No replayPlayer yet, waiting...');
-        }
+        // NOTE: Transition to REPLAY happens immediately in handleCrashReplayTrigger()
+        // This state should be very brief (< 1 frame) before transitioning to REPLAY
+        // If we're still here, just wait for the transition
         break;
       case GameState.REPLAY:
         // Update replay player
         if (this.replayPlayer && this.vehicle) {
-          this.replayPlayer.update(deltaTime);
+          // FIX: Get interpolated frame from replay player
+          const interpolatedFrame = this.replayPlayer.update(deltaTime);
+
+          // FIX: Apply interpolated frame to vehicle (move vehicle to replay position)
+          if (interpolatedFrame) {
+            // Use Vehicle's applyReplayFrame method to set position, rotation, and wheel states
+            this.vehicle.applyReplayFrame(interpolatedFrame);
+            console.log('[REPLAY] Applied frame to vehicle at', interpolatedFrame.vehiclePosition);
+          }
 
           // Check if replay finished
           if (!this.replayPlayer.isPlayingActive()) {
@@ -463,6 +468,11 @@ export class GameEngine {
 
             // Reset crash visuals
             this.vehicle.resetCrashVisuals();
+
+            // Re-enable crash detection
+            if (this.crashManager) {
+              this.crashManager.setEnabled(true);
+            }
 
             // Transition back to PLAYING
             this.setState(GameState.PLAYING);
@@ -480,7 +490,8 @@ export class GameEngine {
    */
   private render(): void {
     // Update camera to follow vehicle (if available)
-    if (this.vehicle && this.state === GameState.PLAYING) {
+    // FIX: Also update camera during REPLAY so it follows the crash cinematically
+    if (this.vehicle && (this.state === GameState.PLAYING || this.state === GameState.REPLAY)) {
       const transform = this.vehicle.getTransform();
       this.cameraSystem.update(0.016, {
         position: transform.position,
@@ -604,10 +615,11 @@ export class GameEngine {
         // Transition to REPLAY immediately
         break;
       case GameState.REPLAY:
-        // Show crash replay control buttons (Retry / Main Menu)
-        if (this.crashReplayUI) {
-          this.crashReplayUI.show();
-        }
+        // FIX: Don't show UI during replay - just let players watch the crash cinematically
+        // We'll add skip/retry buttons later once the core experience is polished
+        // if (this.crashReplayUI) {
+        //   this.crashReplayUI.show();
+        // }
         // Replay player should already be playing (set up in handleCrashReplayTrigger)
         break;
       case GameState.RESULTS:
@@ -1199,6 +1211,12 @@ export class GameEngine {
 
       // Create track with visual mesh and physics collider
       this.track = new Track(trackData, this.physicsWorld, this.sceneManager.scene);
+
+      // DEBUG: Add collision mesh visualization (shows physics geometry as green wireframe)
+      // This helps identify invisible walls and collision issues
+      console.log('[TRACK DEBUG] Enabling collision debug visualization...');
+      this.track.createCollisionDebugMesh(this.sceneManager.scene);
+      console.log('[TRACK DEBUG] Green wireframe shows physics collision mesh');
 
       // Get spawn point from track
       const spawnPoint = this.track.getSpawnPoint();
