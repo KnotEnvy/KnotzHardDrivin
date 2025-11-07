@@ -50,7 +50,14 @@
       "Bash(timeout 30 npm run build:*)",
       "mcp__chrome-devtools__get_console_message",
       "Bash(timeout 300 npm test -- --run)",
-      "mcp__chrome-devtools__new_page"
+      "mcp__chrome-devtools__new_page",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /F /PID 60148 /PID 17228)",
+      "Bash(taskkill //F //PID 60148)",
+      "Bash(taskkill //F //PID 17228)",
+      "Bash(taskkill //F //PID 50692)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
