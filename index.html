@@ -1,17 +1,68 @@
 <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hard Drivin' Remake</title>
-    <link rel="stylesheet" href="/src/styles/replayUI.css">
-    <style>
-      body { margin: 0; overflow: hidden; }
-      #game-canvas { width: 100vw; height: 100vh; display: block; }
-    </style>
-  </head>
-  <body>
-    <canvas id="game-canvas"></canvas>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-  </html>
+<html lang="en">
+<head>
+  <!-- Meta Tags - Character Encoding & Viewport -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+  <!-- Primary Meta Tags -->
+  <title>Hard Drivin' - 3D Racing Game | Play Now</title>
+  <meta name="title" content="Hard Drivin' - Professional 3D Racing Game">
+  <meta name="description" content="Experience Hard Drivin', a high-performance 3D racing game. Race against the clock, compete on leaderboards, and master multiple tracks in this arcade-style racing experience.">
+  <meta name="keywords" content="racing game, 3D racing, arcade racing, online racing, leaderboard, WebGL">
+  <meta name="author" content="Hard Drivin' Game Studio">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Hard Drivin' - 3D Racing Game">
+  <meta property="og:description" content="Experience the thrill of high-speed racing. Compete globally, set records, and become a champion.">
+  <meta property="og:image" content="/assets/og-image.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:title" content="Hard Drivin' - 3D Racing Game">
+  <meta property="twitter:description" content="Experience the thrill of high-speed racing. Compete globally, set records, and become a champion.">
+  <meta property="twitter:image" content="/assets/og-image.png">
+
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#0a0a14">
+  <meta name="msapplication-TileColor" content="#0a0a14">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="/src/styles/main.css">
+  <link rel="stylesheet" href="/src/styles/animations.css">
+  <link rel="stylesheet" href="/src/styles/themes.css">
+  <link rel="stylesheet" href="/src/styles/menus.css">
+  <link rel="stylesheet" href="/src/styles/hud.css">
+  <link rel="stylesheet" href="/src/styles/replayUI.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <!-- Web App Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Inline Critical CSS -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 100vw; height: 100vh; overflow: hidden; background: #0a0a14; color: #fff; }
+    #game-canvas { width: 100vw; height: 100vh; display: block; }
+    #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; }
+    .loading-spinner { position: fixed; top: 50%; left: 50%; width: 60px; height: 60px; border: 4px solid rgba(0,255,136,0.2); border-top-color: #00ff88; border-radius: 50%; animation: spin 1s linear infinite; z-index: 2000; transform: translate(-50%, -50%); }
+    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-container"></div>
+  <div class="loading-spinner" id="loading-spinner" style="display: none;"></div>
+  <noscript>
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a14; display: flex; align-items: center; justify-content: center; z-index: 9999; color: #ff0055; text-align: center; padding: 2rem;">
+      <div><h1>Hard Drivin' Requires JavaScript</h1><p>Please enable JavaScript to play this game.</p></div>
+    </div>
+  </noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

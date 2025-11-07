@@ -1,0 +1,498 @@
+/**
+ * Hard Drivin' - Theme & Color System
+ *
+ * Comprehensive theming system for different game scenarios:
+ * - Dark theme (default, racing at night)
+ * - Light theme (optional, racing in daylight)
+ * - High contrast mode (accessibility)
+ * - Colorblind-friendly mode
+ * - Custom theme overrides
+ *
+ * Performance: Uses CSS custom properties for efficient theme switching
+ * Accessibility: Multiple color palettes, tested with contrast checkers
+ */
+
+/* ===========================
+   DARK THEME (DEFAULT)
+   =========================== */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: linear-gradient(135deg, #0a0a14 0%, #050509 100%);
+  color: #ffffff;
+}
+
+/* Dark theme overrides */
+.theme-dark {
+  --color-primary: #00ff88;
+  --color-primary-dark: #00cc6a;
+  --color-primary-light: #00ffaa;
+
+  --color-secondary: #ff0055;
+  --color-secondary-dark: #cc0044;
+
+  --color-accent-cyan: #00ffff;
+  --color-accent-orange: #ff6b35;
+
+  --color-bg-dark: #0a0a14;
+  --color-bg-darker: #050509;
+  --color-bg-card: #1a1a2e;
+  --color-bg-overlay: #16213e;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #aaaaaa;
+  --color-text-tertiary: #666666;
+
+  --color-border: #00ff88;
+  --color-border-subtle: #333333;
+
+  --color-success: #00ff88;
+  --color-warning: #ffaa00;
+  --color-danger: #ff0055;
+  --color-info: #00ffff;
+}
+
+/* ===========================
+   LIGHT THEME
+   =========================== */
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-primary: #0077cc;
+    --color-primary-dark: #0055aa;
+    --color-primary-light: #0088ee;
+
+    --color-secondary: #cc0055;
+    --color-secondary-dark: #aa0044;
+
+    --color-accent-cyan: #0088ff;
+    --color-accent-orange: #ff6b35;
+
+    --color-bg-dark: #f5f5f5;
+    --color-bg-darker: #eeeeee;
+    --color-bg-card: #ffffff;
+    --color-bg-overlay: #f0f0f0;
+
+    --color-text-primary: #000000;
+    --color-text-secondary: #333333;
+    --color-text-tertiary: #666666;
+
+    --color-border: #0077cc;
+    --color-border-subtle: #dddddd;
+
+    --color-success: #0077cc;
+    --color-warning: #ff7700;
+    --color-danger: #cc0055;
+    --color-info: #0088ff;
+  }
+
+  body {
+    background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);
+    color: #000000;
+  }
+
+  button {
+    color: inherit;
+  }
+}
+
+/* ===========================
+   HIGH CONTRAST MODE
+   =========================== */
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-text-secondary: #cccccc;
+    --color-text-tertiary: #999999;
+    --color-border: #ffff00;
+  }
+
+  button {
+    border-width: 2px;
+    font-weight: var(--font-weight-extrabold);
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    border-width: 3px;
+  }
+
+  /* Increase glow intensity */
+  .text-glow {
+    text-shadow: 0 0 20px rgba(0, 255, 136, 1),
+                 0 0 40px rgba(255, 0, 85, 0.6),
+                 2px 2px 4px rgba(0, 0, 0, 1);
+  }
+
+  /* Enhanced HUD visibility */
+  #speedometer,
+  #damage-indicator,
+  #lap-timer,
+  #position-display {
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.8);
+  }
+
+  /* Stronger focus indicators */
+  button:focus-visible {
+    outline-width: 4px;
+    outline-offset: 3px;
+  }
+
+  /* Darker backgrounds for better contrast */
+  .bg-card,
+  .bg-card-transparent {
+    background: rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* ===========================
+   COLORBLIND-FRIENDLY MODE
+   =========================== */
+
+/* Deuteranopia (Red-Green colorblind) */
+.theme-colorblind-deuteranopia {
+  --color-primary: #0173b2;    /* Blue */
+  --color-primary-dark: #004e89;
+  --color-primary-light: #0096ff;
+
+  --color-secondary: #de8f05;  /* Orange */
+  --color-secondary-dark: #b86f04;
+
+  --color-accent-cyan: #0173b2; /* Blue */
+  --color-accent-orange: #de8f05; /* Orange */
+
+  --color-success: #0173b2;    /* Blue for success */
+  --color-warning: #de8f05;    /* Orange for warning */
+  --color-danger: #ca4233;     /* Reddish-brown */
+  --color-info: #0173b2;       /* Blue for info */
+}
+
+/* Protanopia (Red-Green colorblind - different variant) */
+.theme-colorblind-protanopia {
+  --color-primary: #005f73;    /* Teal */
+  --color-primary-dark: #003d4d;
+  --color-primary-light: #00a0a0;
+
+  --color-secondary: #ff6d00;  /* Orange */
+  --color-secondary-dark: #cc5500;
+
+  --color-accent-cyan: #00bcd4; /* Cyan */
+  --color-accent-orange: #ff6d00; /* Orange */
+
+  --color-success: #005f73;    /* Teal */
+  --color-warning: #ff6d00;    /* Orange */
+  --color-danger: #d32f2f;     /* Red */
+  --color-info: #00bcd4;       /* Cyan */
+}
+
+/* Tritanopia (Blue-Yellow colorblind) */
+.theme-colorblind-tritanopia {
+  --color-primary: #e81828;    /* Red */
+  --color-primary-dark: #b81418;
+  --color-primary-light: #ff3333;
+
+  --color-secondary: #0077b3;  /* Blue */
+  --color-secondary-dark: #004d7a;
+
+  --color-accent-cyan: #0077b3; /* Blue */
+  --color-accent-orange: #e81828; /* Red */
+
+  --color-success: #e81828;    /* Red for success */
+  --color-warning: #ffaa00;    /* Neutral yellow */
+  --color-danger: #0077b3;     /* Blue for danger */
+  --color-info: #0077b3;       /* Blue for info */
+}
+
+/* Achromatopsia (Complete colorblindness - monochrome) */
+.theme-colorblind-achromatopsia {
+  --color-primary: #ff0000;    /* High contrast for accessibility */
+  --color-primary-dark: #cc0000;
+  --color-primary-light: #ff3333;
+
+  --color-secondary: #ff0000;
+  --color-secondary-dark: #cc0000;
+
+  --color-accent-cyan: #ffffff;
+  --color-accent-orange: #ff0000;
+
+  --color-bg-dark: #1a1a1a;
+  --color-bg-darker: #0a0a0a;
+  --color-bg-card: #2a2a2a;
+  --color-bg-overlay: #3a3a3a;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #cccccc;
+  --color-text-tertiary: #999999;
+
+  --color-border: #ff0000;
+  --color-border-subtle: #555555;
+
+  --color-success: #ff0000;
+  --color-warning: #ff0000;
+  --color-danger: #ff0000;
+  --color-info: #ffffff;
+}
+
+/* ===========================
+   RACE STATUS THEMES
+   =========================== */
+
+/* Normal racing - Green accent */
+.state-racing {
+  --color-primary: #00ff88;
+  --color-accent-orange: #ff6b35;
+}
+
+/* Intense racing - Orange/Red accent */
+.state-racing-intense {
+  --color-primary: #ffaa00;
+  --color-accent-orange: #ff0055;
+}
+
+/* Crashed/Damage state - Red accent */
+.state-crashed {
+  --color-primary: #ff0055;
+  --color-danger: #ff3333;
+}
+
+/* Ghost racing - Cyan accent */
+.state-ghost-racing {
+  --color-primary: #00ffff;
+  --color-secondary: #00ffff;
+  --color-accent-cyan: #00ffff;
+}
+
+/* ===========================
+   TIME OF DAY THEMES
+   =========================== */
+
+/* Night racing (default) */
+.time-night {
+  --color-bg-dark: #0a0a14;
+  --color-bg-darker: #050509;
+  --color-primary: #00ff88;
+  --color-accent-cyan: #00ffff;
+}
+
+/* Dawn racing - Purplish tones */
+.time-dawn {
+  --color-bg-dark: #1a0a2e;
+  --color-bg-darker: #0d051e;
+  --color-primary: #b366ff;
+  --color-accent-cyan: #99ccff;
+}
+
+/* Day racing - Bright, high contrast */
+.time-day {
+  --color-bg-dark: #e0e0e0;
+  --color-bg-darker: #d0d0d0;
+  --color-primary: #0077cc;
+  --color-text-primary: #000000;
+  --color-text-secondary: #333333;
+}
+
+/* Dusk racing - Orange/pink tones */
+.time-dusk {
+  --color-bg-dark: #2e1a0a;
+  --color-bg-darker: #1e0d05;
+  --color-primary: #ff6b35;
+  --color-accent-cyan: #ffaa00;
+}
+
+/* ===========================
+   DIFFICULTY THEMES
+   =========================== */
+
+/* Easy difficulty - Green theme */
+.difficulty-easy {
+  --color-primary: #00ff88;
+  --color-secondary: #00ffaa;
+}
+
+/* Medium difficulty - Yellow theme */
+.difficulty-medium {
+  --color-primary: #ffaa00;
+  --color-secondary: #ffcc00;
+  --color-danger: #ff6b35;
+}
+
+/* Hard difficulty - Red theme */
+.difficulty-hard {
+  --color-primary: #ff0055;
+  --color-secondary: #ff3333;
+  --color-danger: #ff0000;
+}
+
+/* Expert difficulty - Neon multi-color */
+.difficulty-expert {
+  --color-primary: #00ffff;
+  --color-secondary: #ff00ff;
+  --color-accent-orange: #ffff00;
+}
+
+/* ===========================
+   MOTION PREFERENCES
+   =========================== */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Disable text glow animations in reduced motion */
+  .text-glow {
+    animation: none;
+  }
+
+  /* Disable button pulse */
+  .btn-glow-pulse {
+    animation: none;
+  }
+
+  /* Disable HUD element glow */
+  #speedometer,
+  #damage-indicator,
+  #lap-timer,
+  #position-display {
+    animation: none;
+  }
+}
+
+/* ===========================
+   TRANSPARENCY & OPACITY
+   =========================== */
+
+/* Transparency levels for different elements */
+.opacity-none {
+  opacity: 1;
+}
+
+.opacity-subtle {
+  opacity: 0.8;
+}
+
+.opacity-moderate {
+  opacity: 0.6;
+}
+
+.opacity-strong {
+  opacity: 0.4;
+}
+
+.opacity-very-strong {
+  opacity: 0.2;
+}
+
+/* Background opacity variations */
+.bg-opacity-light {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.bg-opacity-medium {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.bg-opacity-heavy {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* ===========================
+   GLOSS & MATERIAL EFFECTS
+   =========================== */
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Matte effect */
+.matte {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Metallic effect */
+.metallic {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.1) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Carbon fiber effect */
+.carbon-fiber {
+  background:
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0, 0, 0, 0.2) 2px, rgba(0, 0, 0, 0.2) 4px),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.2) 2px, rgba(0, 0, 0, 0.2) 4px),
+    linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.1));
+}
+
+/* ===========================
+   CUSTOM PROPERTY OVERRIDES
+   =========================== */
+
+/* Allow for inline custom themes */
+[data-theme-primary] {
+  --color-primary: var(--data-theme-primary);
+}
+
+[data-theme-secondary] {
+  --color-secondary: var(--data-theme-secondary);
+}
+
+[data-theme-accent] {
+  --color-accent-orange: var(--data-theme-accent);
+}
+
+/* ===========================
+   TESTING & DEBUG THEMES
+   =========================== */
+
+/* Debug theme - High contrast, visible all elements */
+.theme-debug {
+  --color-primary: #ffff00;
+  --color-secondary: #ff00ff;
+  --color-accent-cyan: #00ffff;
+  --color-accent-orange: #ff8800;
+}
+
+.debug-grid {
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(255, 0, 0, 0.1) 49px, rgba(255, 0, 0, 0.1) 50px),
+    repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(255, 0, 0, 0.1) 49px, rgba(255, 0, 0, 0.1) 50px);
+}
+
+.debug-highlight {
+  outline: 3px solid #ffff00 !important;
+  background: rgba(255, 255, 0, 0.1) !important;
+}
+
+/* ===========================
+   PRINT STYLES
+   =========================== */
+
+@media print {
+  :root {
+    --color-primary: #000000;
+    --color-secondary: #333333;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  /* Hide interactive elements when printing */
+  button,
+  #hud,
+  .btn-primary,
+  .btn-secondary {
+    display: none !important;
+  }
+}

@@ -141,9 +141,14 @@ export class WaypointSystem {
       result.lapCompleted = true;
       result.currentLap = this.lapCount;
 
+      console.log(`[WAYPOINT DEBUG] Lap completed! lapCount=${this.lapCount}, maxLaps=${this.maxLaps}`);
+
       // Check if race finished
       if (this.lapCount >= this.maxLaps) {
         result.raceFinished = true;
+        console.log(`[WAYPOINT DEBUG] RACE FINISHED! lapCount (${this.lapCount}) >= maxLaps (${this.maxLaps})`);
+      } else {
+        console.log(`[WAYPOINT DEBUG] Race continues. Need ${this.maxLaps - this.lapCount} more lap(s)`);
       }
     }
 

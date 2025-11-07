@@ -637,14 +637,20 @@ export class UISystem {
    * Shows results screen with lap time and comprehensive race statistics
    */
   public showResults(lapTime: string, stats: any): void {
+    console.log('[UI RESULTS] showResults called with:', { lapTime, stats });
+    console.log('[UI RESULTS] resultsScreen element:', this.resultsScreen);
+
     this.showPanel(UIPanel.RESULTS);
 
     const timeDisplay = this.resultsScreen?.querySelector('#results-time');
+    console.log('[UI RESULTS] timeDisplay element:', timeDisplay);
     if (timeDisplay) {
       timeDisplay.textContent = lapTime;
+      console.log('[UI RESULTS] Set time display to:', lapTime);
     }
 
     const statsDisplay = this.resultsScreen?.querySelector('#results-stats');
+    console.log('[UI RESULTS] statsDisplay element:', statsDisplay);
     if (statsDisplay) {
       // Build leaderboard section if user qualified
       let leaderboardSection = '';
@@ -667,7 +673,7 @@ export class UISystem {
         }
       }
 
-      statsDisplay.innerHTML = `
+      const statsHTML = `
         <div style="color: #fff; margin: 0.5rem 0;">
           <span style="color: #888;">Best Lap:</span> <span style="color: #00ff88;">${stats.bestLap || 'N/A'}</span>
         </div>
@@ -685,6 +691,16 @@ export class UISystem {
         </div>
         ${leaderboardSection}
       `;
+      statsDisplay.innerHTML = statsHTML;
+      console.log('[UI RESULTS] Stats HTML set successfully. Stats:', {
+        bestLap: stats.bestLap,
+        lapsCompleted: stats.lapsCompleted,
+        crashes: stats.crashes,
+        topSpeed: stats.topSpeed,
+        averageSpeed: stats.averageSpeed
+      });
+    } else {
+      console.error('[UI RESULTS] Stats display element not found!');
     }
   }
 
@@ -744,3 +760,203 @@ export class UISystem {
     console.log('UISystem disposed');
   }
 }
+
+/**
+ * UISystem Enhancement - Animation & Visual Polish Layer
+ * Applied as extension methods to enhance the base UISystem
+ * 
+ * Features:
+ * - Panel transition animations
+ * - HUD element animations
+ * - Button feedback animations
+ * - Speed-based visual effects
+ */
+
+// Augment UISystem prototype with animation methods
+declare global {
+  interface UISystem {
+    animatePanel(panel: UIPanel): void;
+    pulseHUDElement(elementId: string): void;
+    damageIndicatorShake(): void;
+    speedUpdateEffect(): void;
+  }
+}
+
+// Note: These methods enhance the base UISystem implementation
+// They should be called within existing methods to add visual polish
+
+export const UIAnimations = {
+  /**
+   * Apply entrance animation to panel
+   */
+  applyPanelAnimation(element: HTMLElement, panelType: UIPanel): void {
+    element.style.animation = '';
+    // Trigger reflow to restart animation
+    void element.offsetHeight;
+
+    switch (panelType) {
+      case UIPanel.MAIN_MENU:
+      case UIPanel.CAR_SELECTION:
+      case UIPanel.RESULTS:
+        element.classList.add('panel-fade-in');
+        break;
+      case UIPanel.PAUSE_MENU:
+        element.classList.add('panel-fade-in');
+        break;
+      case UIPanel.HUD:
+        element.style.display = 'block';
+        break;
+    }
+  },
+
+  /**
+   * Apply HUD update animation
+   */
+  animateHUDUpdate(element: HTMLElement | null, type: 'speed' | 'timer' | 'position'): void {
+    if (!element) return;
+
+    element.style.animation = '';
+    // Trigger reflow
+    void element.offsetHeight;
+
+    switch (type) {
+      case 'speed':
+        element.classList.add('speed-update-pulse');
+        break;
+      case 'timer':
+        element.classList.add('timer-update');
+        break;
+      case 'position':
+        element.classList.add('position-highlight');
+        break;
+    }
+
+    // Clean up animation class after animation ends
+    setTimeout(() => {
+      element.classList.remove('speed-update-pulse', 'timer-update', 'position-highlight');
+    }, 500);
+  },
+
+  /**
+   * Apply damage indicator animation
+   */
+  damageAnimation(damageElement: HTMLElement | null, damagePercent: number): void {
+    if (!damageElement || !damageElement.parentElement) return;
+
+    const container = damageElement.parentElement;
+
+    if (damagePercent > 75) {
+      container.classList.add('damage-critical');
+    } else {
+      container.classList.remove('damage-critical');
+    }
+  },
+
+  /**
+   * Apply button press effect
+   */
+  buttonPressEffect(button: HTMLElement | null): void {
+    if (!button) return;
+
+    button.classList.add('btn-press');
+    setTimeout(() => {
+      button.classList.remove('btn-press');
+    }, 200);
+  },
+
+  /**
+   * Apply glow pulse to buttons
+   */
+  addButtonGlowPulse(button: HTMLElement | null): void {
+    if (!button) return;
+    button.classList.add('btn-glow-pulse');
+  },
+
+  /**
+   * Remove button glow pulse
+   */
+  removeButtonGlowPulse(button: HTMLElement | null): void {
+    if (!button) return;
+    button.classList.remove('btn-glow-pulse');
+  },
+
+  /**
+   * Add loading spinner animation
+   */
+  showLoadingSpinner(show: boolean = true): void {
+    const spinner = document.getElementById('loading-spinner');
+    if (spinner) {
+      spinner.style.display = show ? 'block' : 'none';
+    }
+  },
+
+  /**
+   * Animate number counting up (for results screen)
+   */
+  animateNumberCounter(element: HTMLElement | null, start: number, end: number, duration: number = 1000): void {
+    if (!element) return;
+
+    const startTime = performance.now();
+    const range = end - start;
+
+    const updateCounter = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      const current = Math.floor(start + range * progress);
+      element.textContent = current.toString();
+
+      if (progress < 1) {
+        requestAnimationFrame(updateCounter);
+      }
+    };
+
+    requestAnimationFrame(updateCounter);
+  },
+};
+
+/**
+ * Export animation utilities for external use
+ */
+export function enhanceUIWithAnimations(ui: UISystem): void {
+  // Hook into showPanel to add animations
+  const originalShowPanel = ui.showPanel.bind(ui);
+  ui.showPanel = function (panel: UIPanel) {
+    originalShowPanel(panel);
+    
+    // Apply animations based on panel type
+    const panelElement = document.getElementById(panel.toString());
+    if (panelElement) {
+      UIAnimations.applyPanelAnimation(panelElement, panel);
+    }
+  };
+
+  // Hook into updateHUD to add animations
+  const originalUpdateHUD = ui.updateHUD.bind(ui);
+  ui.updateHUD = function (data: any) {
+    // Apply animations before update
+    if (data.speed !== undefined) {
+      const speedEl = document.getElementById('speed-value');
+      UIAnimations.animateHUDUpdate(speedEl, 'speed');
+    }
+
+    if (data.lapTime !== undefined) {
+      const timerEl = document.getElementById('timer-value');
+      UIAnimations.animateHUDUpdate(timerEl, 'timer');
+    }
+
+    if (data.position !== undefined) {
+      const posEl = document.getElementById('position-value');
+      UIAnimations.animateHUDUpdate(posEl, 'position');
+    }
+
+    if (data.damage !== undefined) {
+      const damageEl = document.getElementById('damage-fill');
+      UIAnimations.damageAnimation(damageEl, data.damage * 100);
+    }
+
+    // Call original update
+    originalUpdateHUD(data);
+  };
+}
+

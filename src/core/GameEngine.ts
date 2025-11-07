@@ -395,12 +395,14 @@ export class GameEngine {
 
           if (waypointResult.lapCompleted) {
             console.log(`Lap ${waypointResult.currentLap} completed! Progress: ${(this.waypointSystem.getProgress() * 100).toFixed(1)}%`);
+            console.log(`[LAP DEBUG] WaypointSystem: currentLap=${waypointResult.currentLap}, maxLaps=${this.waypointSystem.getMaxLaps()}, raceFinished=${waypointResult.raceFinished}`);
             // Integrate with Timer System (Phase 5A)
             this.timerSystem.onLapCompleted();
           }
 
           if (waypointResult.raceFinished) {
-            console.log('Race finished! All laps completed!');
+            console.log('[RACE FINISH] Race finished! All laps completed! Transitioning to RESULTS state...');
+            console.log(`[RACE FINISH DEBUG] Final lap count: ${waypointResult.currentLap}, Max laps: ${this.waypointSystem.getMaxLaps()}`);
             this.setState(GameState.RESULTS);
           }
 
