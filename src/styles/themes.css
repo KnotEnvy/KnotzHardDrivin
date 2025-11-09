@@ -61,14 +61,14 @@ body {
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-primary: #0077cc;
-    --color-primary-dark: #0055aa;
-    --color-primary-light: #0088ee;
+    --color-primary: #00cc6a;
+    --color-primary-dark: #00aa55;
+    --color-primary-light: #00ff88;
 
     --color-secondary: #cc0055;
     --color-secondary-dark: #aa0044;
 
-    --color-accent-cyan: #0088ff;
+    --color-accent-cyan: #00ffff;
     --color-accent-orange: #ff6b35;
 
     --color-bg-dark: #f5f5f5;
@@ -80,13 +80,13 @@ body {
     --color-text-secondary: #333333;
     --color-text-tertiary: #666666;
 
-    --color-border: #0077cc;
+    --color-border: #00cc6a;
     --color-border-subtle: #dddddd;
 
-    --color-success: #0077cc;
+    --color-success: #00ff88;
     --color-warning: #ff7700;
     --color-danger: #cc0055;
-    --color-info: #0088ff;
+    --color-info: #00ffff;
   }
 
   body {
@@ -155,20 +155,20 @@ body {
 
 /* Deuteranopia (Red-Green colorblind) */
 .theme-colorblind-deuteranopia {
-  --color-primary: #0173b2;    /* Blue */
-  --color-primary-dark: #004e89;
-  --color-primary-light: #0096ff;
+  --color-primary: #00ffff;    /* Cyan */
+  --color-primary-dark: #00cccc;
+  --color-primary-light: #66ffff;
 
   --color-secondary: #de8f05;  /* Orange */
   --color-secondary-dark: #b86f04;
 
-  --color-accent-cyan: #0173b2; /* Blue */
+  --color-accent-cyan: #00ffff; /* Cyan */
   --color-accent-orange: #de8f05; /* Orange */
 
-  --color-success: #0173b2;    /* Blue for success */
+  --color-success: #00ffff;    /* Cyan for success */
   --color-warning: #de8f05;    /* Orange for warning */
   --color-danger: #ca4233;     /* Reddish-brown */
-  --color-info: #0173b2;       /* Blue for info */
+  --color-info: #00ffff;       /* Cyan for info */
 }
 
 /* Protanopia (Red-Green colorblind - different variant) */
@@ -282,15 +282,15 @@ body {
 .time-dawn {
   --color-bg-dark: #1a0a2e;
   --color-bg-darker: #0d051e;
-  --color-primary: #b366ff;
-  --color-accent-cyan: #99ccff;
+  --color-primary: #00ff88;
+  --color-accent-cyan: #00ffff;
 }
 
 /* Day racing - Bright, high contrast */
 .time-day {
   --color-bg-dark: #e0e0e0;
   --color-bg-darker: #d0d0d0;
-  --color-primary: #0077cc;
+  --color-primary: #00cc6a;
   --color-text-primary: #000000;
   --color-text-secondary: #333333;
 }

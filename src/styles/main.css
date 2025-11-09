@@ -31,10 +31,10 @@
   --color-accent-cyan: #00ffff;  /* Cyan - Retro arcade */
   --color-accent-orange: #ff6b35; /* Orange - Warning/boost */
 
-  --color-bg-dark: #0a0a14;      /* Main background */
-  --color-bg-darker: #050509;    /* Darker background */
-  --color-bg-card: #1a1a2e;      /* Card/panel background */
-  --color-bg-overlay: #16213e;   /* Overlay background */
+  --color-bg-dark: #000000;      /* Main background - Pure black */
+  --color-bg-darker: #000000;    /* Darker background - Pure black */
+  --color-bg-card: #0a0a0a;      /* Card/panel background - Very dark */
+  --color-bg-overlay: #050505;   /* Overlay background - Almost black */
 
   --color-text-primary: #ffffff; /* Primary text */
   --color-text-secondary: #aaaaaa; /* Secondary text */
@@ -88,12 +88,12 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 0 20px rgba(0, 255, 136, 0.3);
-  --shadow-glow-intense: 0 0 30px rgba(0, 255, 136, 0.6);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.8);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.9);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.95);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 1);
+  --shadow-glow: 0 0 30px rgba(0, 255, 136, 0.8), 0 0 60px rgba(0, 255, 136, 0.4);
+  --shadow-glow-intense: 0 0 40px rgba(0, 255, 136, 1), 0 0 80px rgba(0, 255, 136, 0.6), 0 0 120px rgba(0, 255, 136, 0.3);
 
   /* Transitions & Animations */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -370,9 +370,11 @@ button:focus-visible {
 
 .text-glow {
   color: var(--color-primary);
-  text-shadow: 0 0 10px rgba(0, 255, 136, 0.8),
-               0 0 20px rgba(255, 0, 85, 0.3),
-               2px 2px 4px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 20px rgba(0, 255, 136, 1),
+               0 0 40px rgba(0, 255, 136, 0.8),
+               0 0 60px rgba(0, 255, 136, 0.6),
+               0 0 80px rgba(0, 255, 136, 0.4),
+               2px 2px 4px rgba(0, 0, 0, 1);
 }
 
 /* Visibility */

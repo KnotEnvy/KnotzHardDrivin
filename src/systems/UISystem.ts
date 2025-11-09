@@ -42,6 +42,7 @@ export enum UIPanel {
   PAUSE_MENU = 'pause-menu',
   RESULTS = 'results',
   SETTINGS = 'settings',
+  LEADERBOARD = 'leaderboard',
   LOADING = 'loading',
 }
 
@@ -58,6 +59,8 @@ export class UISystem {
   private hud: HTMLElement | null = null;
   private pauseMenu: HTMLElement | null = null;
   private resultsScreen: HTMLElement | null = null;
+  private settingsScreen: HTMLElement | null = null;
+  private leaderboardScreen: HTMLElement | null = null;
 
   // HUD Elements
   private speedometer: HTMLElement | null = null;
@@ -107,6 +110,8 @@ export class UISystem {
     this.createHUD();
     this.createPauseMenu();
     this.createResultsScreen();
+    this.createSettingsScreen();
+    this.createLeaderboardScreen();
 
     this.initialized = true;
     console.log('UISystem initialized');
@@ -118,16 +123,7 @@ export class UISystem {
   private createUIContainer(): void {
     this.container = document.createElement('div');
     this.container.id = 'ui-container';
-    this.container.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      font-family: 'Arial', sans-serif;
-      z-index: 1000;
-    `;
+    // Styling handled by CSS
     document.body.appendChild(this.container);
   }
 
@@ -137,68 +133,15 @@ export class UISystem {
   private createMainMenu(): void {
     this.mainMenu = document.createElement('div');
     this.mainMenu.id = 'main-menu';
-    this.mainMenu.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: all;
-    `;
 
     this.mainMenu.innerHTML = `
-      <h1 style="color: #fff; font-size: 4rem; margin-bottom: 2rem; text-shadow: 0 0 20px #00ff88;">
-        HARD DRIVIN'
-      </h1>
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <button id="btn-start" style="
-          padding: 1rem 3rem;
-          font-size: 1.5rem;
-          background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-          border: none;
-          border-radius: 8px;
-          color: #1a1a2e;
-          font-weight: bold;
-          cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          pointer-events: all;
-        ">START RACE</button>
-        <button id="btn-leaderboard" style="
-          padding: 1rem 3rem;
-          font-size: 1.2rem;
-          background: #2a2a3e;
-          border: 2px solid #00ff88;
-          border-radius: 8px;
-          color: #00ff88;
-          font-weight: bold;
-          cursor: pointer;
-          transition: transform 0.2s;
-          pointer-events: all;
-        ">LEADERBOARD</button>
-        <button id="btn-settings" style="
-          padding: 1rem 3rem;
-          font-size: 1.2rem;
-          background: #2a2a3e;
-          border: 2px solid #00ff88;
-          border-radius: 8px;
-          color: #00ff88;
-          font-weight: bold;
-          cursor: pointer;
-          transition: transform 0.2s;
-          pointer-events: all;
-        ">SETTINGS</button>
+      <h1>HARD DRIVIN'</h1>
+      <div class="menu-button-group">
+        <button id="btn-start" class="menu-button btn-primary">START RACE</button>
+        <button id="btn-leaderboard" class="menu-button btn-secondary">LEADERBOARD</button>
+        <button id="btn-settings" class="menu-button btn-secondary">SETTINGS</button>
       </div>
-      <div style="
-        position: absolute;
-        bottom: 2rem;
-        color: #888;
-        font-size: 0.9rem;
-      ">
+      <div class="menu-footer">
         Press SPACE to start | ESC for menu
       </div>
     `;
@@ -212,124 +155,55 @@ export class UISystem {
   private createCarSelection(): void {
     this.carSelection = document.createElement('div');
     this.carSelection.id = 'car-selection';
-    this.carSelection.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: all;
-    `;
+    this.carSelection.style.display = 'none';
 
     this.carSelection.innerHTML = `
-      <h1 style="color: #fff; font-size: 3rem; margin-bottom: 3rem; text-shadow: 0 0 20px #00ff88;">
-        SELECT YOUR VEHICLE
-      </h1>
-      <div style="display: flex; gap: 3rem; margin-bottom: 2rem;">
+      <h1>SELECT YOUR VEHICLE</h1>
+      <div class="car-grid">
         <!-- Corvette Card -->
-        <div id="select-corvette" style="
-          width: 350px;
-          background: rgba(255, 0, 0, 0.1);
-          border: 3px solid #ff0000;
-          border-radius: 12px;
-          padding: 2rem;
-          cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
-          pointer-events: all;
-        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 0 30px rgba(255,0,0,0.5)';"
-           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
-          <div style="
-            width: 100%;
-            height: 150px;
-            background: #ff0000;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-          ">
-            🏎️
+        <div id="select-corvette" class="car-card corvette">
+          <div class="car-card-image">🏎️</div>
+          <h2>CORVETTE</h2>
+          <div class="car-stats">
+            <div class="car-stats-row">
+              <span class="car-stats-label">⚡ Speed:</span>
+              <span class="car-stats-value">★★★★★</span>
+            </div>
+            <div class="car-stats-row">
+              <span class="car-stats-label">🏋️ Handling:</span>
+              <span class="car-stats-value">★★★★☆</span>
+            </div>
+            <div class="car-stats-row">
+              <span class="car-stats-label">🛡️ Durability:</span>
+              <span class="car-stats-value">★★★☆☆</span>
+            </div>
           </div>
-          <h2 style="color: #ff0000; font-size: 2rem; margin-bottom: 1rem; text-align: center;">
-            CORVETTE
-          </h2>
-          <div style="color: #aaa; font-size: 0.9rem; line-height: 1.6;">
-            <div style="margin-bottom: 0.5rem;">⚡ Speed: ★★★★★</div>
-            <div style="margin-bottom: 0.5rem;">🏋️ Handling: ★★★★☆</div>
-            <div style="margin-bottom: 0.5rem;">🛡️ Durability: ★★★☆☆</div>
-          </div>
-          <div style="
-            margin-top: 1.5rem;
-            padding: 0.8rem;
-            background: rgba(255, 0, 0, 0.2);
-            border-radius: 6px;
-            color: #fff;
-            text-align: center;
-            font-weight: bold;
-          ">
-            CLASSIC SPORTS CAR
-          </div>
+          <div class="car-description">CLASSIC SPORTS CAR</div>
         </div>
 
         <!-- Cybertruck Card -->
-        <div id="select-cybertruck" style="
-          width: 350px;
-          background: rgba(192, 192, 192, 0.1);
-          border: 3px solid #c0c0c0;
-          border-radius: 12px;
-          padding: 2rem;
-          cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
-          pointer-events: all;
-        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 0 30px rgba(192,192,192,0.5)';"
-           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
-          <div style="
-            width: 100%;
-            height: 150px;
-            background: #c0c0c0;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-          ">
-            🚙
+        <div id="select-cybertruck" class="car-card cybertruck">
+          <div class="car-card-image">🚙</div>
+          <h2>CYBERTRUCK</h2>
+          <div class="car-stats">
+            <div class="car-stats-row">
+              <span class="car-stats-label">⚡ Speed:</span>
+              <span class="car-stats-value">★★★☆☆</span>
+            </div>
+            <div class="car-stats-row">
+              <span class="car-stats-label">🏋️ Handling:</span>
+              <span class="car-stats-value">★★★☆☆</span>
+            </div>
+            <div class="car-stats-row">
+              <span class="car-stats-label">🛡️ Durability:</span>
+              <span class="car-stats-value">★★★★★</span>
+            </div>
           </div>
-          <h2 style="color: #c0c0c0; font-size: 2rem; margin-bottom: 1rem; text-align: center;">
-            CYBERTRUCK
-          </h2>
-          <div style="color: #aaa; font-size: 0.9rem; line-height: 1.6;">
-            <div style="margin-bottom: 0.5rem;">⚡ Speed: ★★★☆☆</div>
-            <div style="margin-bottom: 0.5rem;">🏋️ Handling: ★★★☆☆</div>
-            <div style="margin-bottom: 0.5rem;">🛡️ Durability: ★★★★★</div>
-          </div>
-          <div style="
-            margin-top: 1.5rem;
-            padding: 0.8rem;
-            background: rgba(192, 192, 192, 0.2);
-            border-radius: 6px;
-            color: #fff;
-            text-align: center;
-            font-weight: bold;
-          ">
-            FUTURISTIC BEAST
-          </div>
+          <div class="car-description">FUTURISTIC BEAST</div>
         </div>
       </div>
 
-      <div style="
-        position: absolute;
-        bottom: 2rem;
-        color: #888;
-        font-size: 0.9rem;
-      ">
+      <div class="menu-footer">
         Select a vehicle to begin | ESC to go back
       </div>
     `;
@@ -343,87 +217,34 @@ export class UISystem {
   private createHUD(): void {
     this.hud = document.createElement('div');
     this.hud.id = 'hud';
-    this.hud.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: none;
-      pointer-events: none;
-    `;
+    this.hud.style.display = 'none';
 
     this.hud.innerHTML = `
       <!-- Speedometer (bottom left) -->
-      <div id="speedometer" style="
-        position: absolute;
-        bottom: 2rem;
-        left: 2rem;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 1.5rem;
-        border-radius: 12px;
-        border: 2px solid #00ff88;
-      ">
-        <div style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">SPEED</div>
-        <div id="speed-value" style="color: #00ff88; font-size: 3rem; font-weight: bold; line-height: 1;">0</div>
-        <div style="color: #888; font-size: 0.9rem; margin-top: 0.3rem;">MPH</div>
+      <div id="speedometer" class="hud-speedometer">
+        <div class="hud-speedometer-label">SPEED</div>
+        <div id="speed-value" class="hud-speed-value">0</div>
+        <div class="hud-speed-unit">MPH</div>
       </div>
 
       <!-- Lap Timer (top center) -->
-      <div id="lap-timer" style="
-        position: absolute;
-        top: 2rem;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.7);
-        padding: 1rem 2rem;
-        border-radius: 12px;
-        border: 2px solid #00ff88;
-        text-align: center;
-      ">
-        <div style="color: #888; font-size: 0.8rem; margin-bottom: 0.3rem;">LAP TIME</div>
-        <div id="timer-value" style="color: #00ff88; font-size: 2rem; font-weight: bold;">00:00.000</div>
-        <div id="lap-count" style="color: #888; font-size: 0.9rem; margin-top: 0.3rem;">LAP 1 / 3</div>
+      <div id="lap-timer" class="hud-lap-timer">
+        <div class="hud-timer-label">LAP TIME</div>
+        <div id="timer-value" class="hud-timer-value">00:00.000</div>
+        <div id="lap-count" class="hud-lap-count">LAP 1 / 3</div>
       </div>
 
       <!-- Position (top right) -->
-      <div id="position-display" style="
-        position: absolute;
-        top: 2rem;
-        right: 2rem;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        border: 2px solid #00ff88;
-      ">
-        <div style="color: #888; font-size: 0.8rem; margin-bottom: 0.3rem;">POSITION</div>
-        <div id="position-value" style="color: #00ff88; font-size: 2.5rem; font-weight: bold;">1st</div>
+      <div id="position-display" class="hud-position">
+        <div class="hud-position-label">POSITION</div>
+        <div id="position-value" class="hud-position-value">1st</div>
       </div>
 
       <!-- Damage Indicator (bottom right) -->
-      <div id="damage-indicator" style="
-        position: absolute;
-        bottom: 2rem;
-        right: 2rem;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 1rem;
-        border-radius: 12px;
-        border: 2px solid #00ff88;
-      ">
-        <div style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">DAMAGE</div>
-        <div id="damage-bar" style="
-          width: 200px;
-          height: 20px;
-          background: #2a2a3e;
-          border-radius: 4px;
-          overflow: hidden;
-        ">
-          <div id="damage-fill" style="
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #00ff88 0%, #ff0000 100%);
-            transition: width 0.3s;
-          "></div>
+      <div id="damage-indicator" class="hud-damage">
+        <div class="hud-damage-label">DAMAGE</div>
+        <div id="damage-bar" class="hud-damage-bar">
+          <div id="damage-fill" class="hud-damage-fill"></div>
         </div>
       </div>
     `;
@@ -444,53 +265,14 @@ export class UISystem {
   private createPauseMenu(): void {
     this.pauseMenu = document.createElement('div');
     this.pauseMenu.id = 'pause-menu';
-    this.pauseMenu.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: all;
-    `;
+    this.pauseMenu.style.display = 'none';
 
     this.pauseMenu.innerHTML = `
-      <h2 style="color: #fff; font-size: 3rem; margin-bottom: 2rem;">PAUSED</h2>
-      <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <button id="btn-resume" style="
-          padding: 1rem 3rem;
-          font-size: 1.5rem;
-          background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-          border: none;
-          border-radius: 8px;
-          color: #1a1a2e;
-          font-weight: bold;
-          cursor: pointer;
-        ">RESUME</button>
-        <button id="btn-restart" style="
-          padding: 1rem 3rem;
-          font-size: 1.2rem;
-          background: #2a2a3e;
-          border: 2px solid #00ff88;
-          border-radius: 8px;
-          color: #00ff88;
-          font-weight: bold;
-          cursor: pointer;
-        ">RESTART</button>
-        <button id="btn-quit" style="
-          padding: 1rem 3rem;
-          font-size: 1.2rem;
-          background: #2a2a3e;
-          border: 2px solid #ff0000;
-          border-radius: 8px;
-          color: #ff0000;
-          font-weight: bold;
-          cursor: pointer;
-        ">QUIT TO MENU</button>
+      <h2>PAUSED</h2>
+      <div class="pause-button-group">
+        <button id="btn-resume" class="btn-primary">RESUME</button>
+        <button id="btn-restart" class="btn-secondary">RESTART</button>
+        <button id="btn-quit" class="btn-danger">QUIT TO MENU</button>
       </div>
     `;
 
@@ -503,60 +285,110 @@ export class UISystem {
   private createResultsScreen(): void {
     this.resultsScreen = document.createElement('div');
     this.resultsScreen.id = 'results-screen';
-    this.resultsScreen.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: all;
-    `;
+    this.resultsScreen.style.display = 'none';
 
     this.resultsScreen.innerHTML = `
-      <h2 style="color: #fff; font-size: 3rem; margin-bottom: 1rem;">RACE COMPLETE!</h2>
-      <div id="results-time" style="color: #00ff88; font-size: 2.5rem; font-weight: bold; margin-bottom: 2rem;">
-        00:00.000
-      </div>
-      <div id="results-details" style="
-        background: rgba(0, 0, 0, 0.5);
-        padding: 2rem;
-        border-radius: 12px;
-        border: 2px solid #00ff88;
-        margin-bottom: 2rem;
-      ">
+      <h2>RACE COMPLETE!</h2>
+      <div id="results-time">00:00.000</div>
+      <div id="results-details">
         <div style="color: #888; margin-bottom: 1rem;">RACE STATISTICS</div>
         <div id="results-stats"></div>
       </div>
-      <div style="display: flex; gap: 1rem;">
-        <button id="btn-race-again" style="
-          padding: 1rem 2rem;
-          font-size: 1.2rem;
-          background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
-          border: none;
-          border-radius: 8px;
-          color: #1a1a2e;
-          font-weight: bold;
-          cursor: pointer;
-        ">RACE AGAIN</button>
-        <button id="btn-main-menu" style="
-          padding: 1rem 2rem;
-          font-size: 1.2rem;
-          background: #2a2a3e;
-          border: 2px solid #00ff88;
-          border-radius: 8px;
-          color: #00ff88;
-          font-weight: bold;
-          cursor: pointer;
-        ">MAIN MENU</button>
+      <div class="results-button-group">
+        <button id="btn-race-again" class="btn-primary">RACE AGAIN</button>
+        <button id="btn-main-menu" class="btn-secondary">MAIN MENU</button>
       </div>
     `;
 
     this.container?.appendChild(this.resultsScreen);
+  }
+
+  /**
+   * Creates settings screen
+   */
+  private createSettingsScreen(): void {
+    this.settingsScreen = document.createElement('div');
+    this.settingsScreen.id = 'settings-screen';
+    this.settingsScreen.style.display = 'none';
+
+    this.settingsScreen.innerHTML = `
+      <h2>SETTINGS</h2>
+      <div class="settings-content">
+        <div class="settings-section">
+          <h3>GRAPHICS</h3>
+          <div class="settings-option">
+            <label>Quality Preset:</label>
+            <select id="setting-quality" class="settings-select">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="ultra">Ultra</option>
+            </select>
+          </div>
+          <div class="settings-option">
+            <label>Shadows:</label>
+            <input type="checkbox" id="setting-shadows" checked class="settings-checkbox">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>AUDIO</h3>
+          <div class="settings-option">
+            <label>Master Volume:</label>
+            <input type="range" id="setting-volume" min="0" max="100" value="70" class="settings-slider">
+            <span class="settings-value">70%</span>
+          </div>
+          <div class="settings-option">
+            <label>Engine Sounds:</label>
+            <input type="checkbox" id="setting-engine-audio" checked class="settings-checkbox">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>CONTROLS</h3>
+          <div class="settings-option">
+            <label>Steering Sensitivity:</label>
+            <input type="range" id="setting-steering" min="1" max="10" value="5" class="settings-slider">
+            <span class="settings-value">5</span>
+          </div>
+        </div>
+      </div>
+      <div class="settings-button-group">
+        <button id="btn-save-settings" class="btn-primary">SAVE SETTINGS</button>
+        <button id="btn-cancel-settings" class="btn-secondary">CANCEL</button>
+      </div>
+    `;
+
+    this.container?.appendChild(this.settingsScreen);
+  }
+
+  /**
+   * Creates leaderboard screen
+   */
+  private createLeaderboardScreen(): void {
+    this.leaderboardScreen = document.createElement('div');
+    this.leaderboardScreen.id = 'leaderboard-screen';
+    this.leaderboardScreen.style.display = 'none';
+
+    this.leaderboardScreen.innerHTML = `
+      <h2>LEADERBOARD</h2>
+      <div class="leaderboard-content">
+        <div class="leaderboard-header">
+          <span class="leaderboard-col-rank">RANK</span>
+          <span class="leaderboard-col-player">PLAYER</span>
+          <span class="leaderboard-col-time">TIME</span>
+        </div>
+        <div id="leaderboard-list" class="leaderboard-list">
+          <!-- Leaderboard entries will be populated dynamically -->
+          <div class="leaderboard-empty">No entries yet. Be the first to set a record!</div>
+        </div>
+      </div>
+      <div class="leaderboard-button-group">
+        <button id="btn-close-leaderboard" class="btn-primary">BACK TO MENU</button>
+      </div>
+    `;
+
+    this.container?.appendChild(this.leaderboardScreen);
   }
 
   /**
@@ -582,6 +414,15 @@ export class UISystem {
       case UIPanel.RESULTS:
         if (this.resultsScreen) this.resultsScreen.style.display = 'flex';
         break;
+      case UIPanel.SETTINGS:
+        if (this.settingsScreen) this.settingsScreen.style.display = 'flex';
+        break;
+      case UIPanel.LEADERBOARD:
+        if (this.leaderboardScreen) this.leaderboardScreen.style.display = 'flex';
+        break;
+      case UIPanel.LOADING:
+        // Loading screen handled separately
+        break;
     }
   }
 
@@ -594,6 +435,8 @@ export class UISystem {
     if (this.hud) this.hud.style.display = 'none';
     if (this.pauseMenu) this.pauseMenu.style.display = 'none';
     if (this.resultsScreen) this.resultsScreen.style.display = 'none';
+    if (this.settingsScreen) this.settingsScreen.style.display = 'none';
+    if (this.leaderboardScreen) this.leaderboardScreen.style.display = 'none';
   }
 
   /**
@@ -656,16 +499,18 @@ export class UISystem {
       let leaderboardSection = '';
       if (stats.qualifiesForLeaderboard) {
         leaderboardSection = `
-          <div style="color: #00ff88; margin: 1rem 0 0.5rem 0; font-weight: bold;">
+          <div class="leaderboard-section-title">
             LEADERBOARD RANKING: ${stats.leaderboardRank > 0 ? `#${stats.leaderboardRank}` : 'N/A'}
           </div>
         `;
         if (stats.leaderboardEntries && stats.leaderboardEntries.length > 0) {
-          leaderboardSection += `<div style="margin-top: 1rem; border-top: 1px solid #444; padding-top: 1rem;">`;
+          leaderboardSection += `<div class="leaderboard-section">`;
           stats.leaderboardEntries.forEach((entry: any, index: number) => {
             leaderboardSection += `
-              <div style="color: #aaa; margin: 0.4rem 0; font-size: 0.9rem;">
-                <span style="color: #00ff88; font-weight: bold;">#${index + 1}</span> ${entry.playerName} - ${entry.lapTime}
+              <div class="leaderboard-entry">
+                <span class="leaderboard-rank">#${index + 1}</span>
+                <span class="leaderboard-name">${entry.playerName}</span>
+                <span class="leaderboard-time">${entry.lapTime}</span>
               </div>
             `;
           });
@@ -674,20 +519,25 @@ export class UISystem {
       }
 
       const statsHTML = `
-        <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Best Lap:</span> <span style="color: #00ff88;">${stats.bestLap || 'N/A'}</span>
+        <div class="results-stat-row">
+          <span class="results-stat-label">Best Lap:</span>
+          <span class="results-stat-value">${stats.bestLap || 'N/A'}</span>
         </div>
-        <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Laps Completed:</span> <span style="color: #00ff88;">${stats.lapsCompleted || 0}</span>
+        <div class="results-stat-row">
+          <span class="results-stat-label">Laps Completed:</span>
+          <span class="results-stat-value">${stats.lapsCompleted || 0}</span>
         </div>
-        <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Crashes:</span> <span style="color: #ff6b6b;">${stats.crashes || 0}</span>
+        <div class="results-stat-row">
+          <span class="results-stat-label">Crashes:</span>
+          <span class="results-stat-value" style="color: #ff6b6b;">${stats.crashes || 0}</span>
         </div>
-        <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Top Speed:</span> <span style="color: #00ff88;">${stats.topSpeed || 0} MPH</span>
+        <div class="results-stat-row">
+          <span class="results-stat-label">Top Speed:</span>
+          <span class="results-stat-value">${stats.topSpeed || 0} MPH</span>
         </div>
-        <div style="color: #fff; margin: 0.5rem 0;">
-          <span style="color: #888;">Average Speed:</span> <span style="color: #00ff88;">${stats.averageSpeed || 0} MPH</span>
+        <div class="results-stat-row">
+          <span class="results-stat-label">Average Speed:</span>
+          <span class="results-stat-value">${stats.averageSpeed || 0} MPH</span>
         </div>
         ${leaderboardSection}
       `;
@@ -747,9 +597,12 @@ export class UISystem {
     }
 
     this.mainMenu = null;
+    this.carSelection = null;
     this.hud = null;
     this.pauseMenu = null;
     this.resultsScreen = null;
+    this.settingsScreen = null;
+    this.leaderboardScreen = null;
     this.speedometer = null;
     this.lapTimer = null;
     this.positionDisplay = null;

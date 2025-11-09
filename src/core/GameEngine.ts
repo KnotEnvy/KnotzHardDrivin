@@ -871,7 +871,7 @@ export class GameEngine {
         this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
       }
 
-      // ESC to toggle pause (PLAYING <-> PAUSED)
+      // ESC to navigate back or toggle pause
       if (e.code === 'Escape') {
         if (this.state === GameState.PLAYING) {
           e.preventDefault();
@@ -883,6 +883,18 @@ export class GameEngine {
           console.log('ESC pressed - resuming game');
           this.setState(GameState.PLAYING);
           this.uiSystem?.showPanel(UIPanel.HUD);
+        } else if (this.state === GameState.MENU) {
+          // ESC from Settings/Leaderboard returns to main menu
+          const currentPanel = this.uiSystem?.getCurrentPanel();
+          if (currentPanel === UIPanel.SETTINGS || currentPanel === UIPanel.LEADERBOARD) {
+            e.preventDefault();
+            console.log('ESC pressed - returning to main menu');
+            this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+          } else if (currentPanel === UIPanel.CAR_SELECTION) {
+            e.preventDefault();
+            console.log('ESC pressed - returning to main menu from car selection');
+            this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+          }
         }
       }
 
@@ -905,23 +917,32 @@ export class GameEngine {
     // Main Menu - Leaderboard button
     this.uiSystem.onButtonClick('btn-leaderboard', () => {
       console.log('Leaderboard button clicked');
-      const entries = this.leaderboardSystem.getLeaderboard();
-
-      if (entries.length === 0) {
-        alert('No leaderboard entries yet. Complete a race to set a time!');
-      } else {
-        let leaderboardText = '=== LEADERBOARD ===\n\n';
-        entries.forEach((entry, index) => {
-          leaderboardText += `${index + 1}. ${entry.playerName} - ${entry.lapTime}\n`;
-        });
-        alert(leaderboardText);
-      }
+      this.showLeaderboard();
     });
 
     // Main Menu - Settings button
     this.uiSystem.onButtonClick('btn-settings', () => {
       console.log('Settings button clicked');
-      alert('Settings panel coming soon!\n\nControls:\n- W/S: Throttle/Brake\n- A/D: Steer\n- Space: Handbrake\n- R: Reset\n- ESC: Pause\n- C: Switch Camera');
+      this.uiSystem?.showPanel(UIPanel.SETTINGS);
+    });
+
+    // Settings - Back button
+    this.uiSystem.onButtonClick('btn-cancel-settings', () => {
+      console.log('Cancel settings clicked');
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+    });
+
+    // Settings - Save button
+    this.uiSystem.onButtonClick('btn-save-settings', () => {
+      console.log('Save settings clicked');
+      // TODO: Actually save settings
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+    });
+
+    // Leaderboard - Back button
+    this.uiSystem.onButtonClick('btn-close-leaderboard', () => {
+      console.log('Close leaderboard clicked');
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
     });
 
     // Pause Menu - Resume button
@@ -962,6 +983,45 @@ export class GameEngine {
     });
 
     console.log('UI event handlers set up');
+  }
+
+  /**
+   * Shows the leaderboard screen with current entries
+   */
+  private showLeaderboard(): void {
+    if (!this.uiSystem) return;
+
+    // Show the leaderboard panel
+    this.uiSystem.showPanel(UIPanel.LEADERBOARD);
+
+    // Get leaderboard data
+    const entries = this.leaderboardSystem.getLeaderboard();
+    const listContainer = document.getElementById('leaderboard-list');
+
+    if (!listContainer) {
+      console.error('Leaderboard list container not found');
+      return;
+    }
+
+    // Clear existing entries
+    listContainer.innerHTML = '';
+
+    if (entries.length === 0) {
+      // Show empty state
+      listContainer.innerHTML = '<div class="leaderboard-empty">No entries yet. Be the first to set a record!</div>';
+    } else {
+      // Populate leaderboard entries
+      entries.forEach((entry, index) => {
+        const entryDiv = document.createElement('div');
+        entryDiv.className = 'leaderboard-entry';
+        entryDiv.innerHTML = `
+          <span class="leaderboard-rank">#${index + 1}</span>
+          <span class="leaderboard-name">${entry.playerName}</span>
+          <span class="leaderboard-time">${entry.lapTime}</span>
+        `;
+        listContainer.appendChild(entryDiv);
+      });
+    }
   }
 
   /**
