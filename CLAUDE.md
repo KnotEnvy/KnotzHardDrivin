@@ -1,8 +1,8 @@
-# Hard Drivin' Remake - Alpha 1.0.5
+# Hard Drivin' Remake - Alpha 1.1.0
 
-**Status**: Alpha - UI Refactor Complete, Ready for Visual Enhancement
-**Version**: 1.0.5
-**Last Updated**: November 7, 2025
+**Status**: Alpha - Visual Enhancement Complete, Beta Prep Phase
+**Version**: 1.1.0
+**Last Updated**: November 9, 2025
 **Stack**: TypeScript + Three.js + Rapier.js + Vite + Howler.js
 
 ---
@@ -38,13 +38,15 @@ npm run dev          # Opens http://localhost:4200
 ### Systems Complete
 - **Vehicle Physics**: 4-wheel raycasting, suspension, engine/transmission, tire forces
 - **Track System**: Spline-based tracks with waypoints, obstacles, surface types
-- **Camera System**: Chase camera, first-person, cinematic crash replay
+- **Camera System**: Chase camera, first-person, menu camera, cinematic crash replay
 - **Crash Detection**: Force-based detection with 3-stage cinematic replay
 - **Replay System**: 60Hz recording, smooth interpolation, auto-playback
 - **Timer System**: Lap tracking, race timer, checkpoint system
 - **Leaderboard**: Top 10 persistent scores with ghost data
 - **Audio System**: Engine sounds (RPM-based), spatial audio, volume controls
-- **UI/HUD**: Main menu, car selection, in-game HUD, pause menu, results screen, settings screen, leaderboard screen (all refactored with external CSS)
+- **UI/HUD**: Main menu, car selection, in-game HUD, pause menu, results screen, settings screen, leaderboard screen
+- **Visual Enhancement**: 3D menu backgrounds, attract mode, animated gradients, chrome effects, CRT post-processing
+- **Menu System**: Attract screen, keyboard navigation, smooth transitions, 3D rotating car showcase
 
 ### Performance Metrics
 - **Frame Rate**: 77+ fps average (200+ fps peak)
@@ -93,6 +95,18 @@ __DOCS__/              # All documentation
 
 ## Recent Fixes
 
+### Session Nov 9, 2025 - Visual Enhancement Complete ✅
+1. **3D Menu Background** - Rotating vehicle showcase with cinematic lighting (spot + fill)
+2. **Attract Mode** - "INSERT COIN" landing screen with 30s auto-advance, scrolling high scores
+3. **Post-Processing Optimization** - CRT effects optimized from 5-8ms → <1ms (80-88% faster)
+4. **Animated Gradients** - Color-shifting backgrounds with speed lines
+5. **Chrome Logo** - Metallic shader with scanlines, breathing glow, glitch effects
+6. **Particle Systems** - 200 particles (sparks + dust) for menu ambiance
+7. **Smooth Transitions** - Fade/blur/zoom effects between all screens
+8. **Keyboard Navigation** - Arrow keys/WASD navigation in pause menu
+9. **Visual Feedback** - Green flash effect when pressing keys on attract screen
+10. **Performance** - <1ms post-processing, 60fps maintained, zero warnings
+
 ### Session Nov 7, 2025 - UI Refactoring ✅
 1. **Inline Styles Removed** - Refactored UISystem.ts (~95% of inline styles eliminated)
 2. **External CSS Classes** - All UI elements now use semantic CSS classes
@@ -122,13 +136,6 @@ __DOCS__/              # All documentation
 
 ## Known Issues
 
-### High Priority (Next Session - Visual Enhancement)
-- Main menu lacks dynamic background (static black screen)
-- No landing/attract mode (needs "INSERT COIN" / "PRESS START" screen)
-- Missing animated visual effects (speed lines, particles, transitions)
-- No 3D background elements (rotating car, track flythrough)
-- Menu transitions are instant (need smooth fades/wipes)
-
 ### Low Priority
 - 47 test failures (non-critical: AudioSystem timeouts, CrashManager thresholds)
 - Some `any` types in codebase (deferred to polish phase)
@@ -137,66 +144,191 @@ __DOCS__/              # All documentation
 
 ---
 
-## Next Phase: Visual Enhancement - "The Facelift of the Century"
+## Beta Roadmap - Path to Release
 
-**Goal**: Transform functional menus into a jaw-dropping retro-arcade experience with dynamic backgrounds, animations, and cinematic effects
+**Current State**: Alpha 1.1.0 - Visual Enhancement Complete
+**Target**: Beta 1.0.0 - Full Feature Complete, Production Ready
 
-### Phase 1 - Quick Visual Wins (30 min)
-**Immediate Impact Enhancements**:
-1. **Animated Gradient Background** - Slow color-shifting backdrop (neon green/magenta/cyan)
-2. **Speed Lines Animation** - Racing stripes pulsing from edges toward center
-3. **Enhanced Logo Treatment** - Metallic chrome shader, scanlines, glitch effects
-4. **Pulsing Start Button** - Intense breathing glow effect to draw attention
-5. **Screen Transitions** - Fade to black with speed blur between menus
+### Phase 9 - Game Flow & Progression (Priority: HIGH)
+**Goal**: Multi-track campaign with progression system
 
-**Expected Result**: Professional polish, immediate visual upgrade
+**Features**:
+1. **Post-Race Flow**
+   - Victory/defeat animations
+   - Star rating system (Bronze/Silver/Gold based on time)
+   - Track unlock system
+   - "Next Track" / "Retry" / "Main Menu" options
 
-### Phase 2 - 3D Background Scene (60 min)
-**Dynamic 3D Elements**:
-1. **Choose One Background Style**:
-   - **Option A**: Rotating 3D car model with spotlight in garage setting
-   - **Option B**: Flythrough camera loop over the game track
-   - **Option C**: Abstract neon tunnel with geometric grid patterns
-2. **Particle System** - Floating sparks, dust, speed trails
-3. **Depth Effects** - Depth of field blur, vignette, film grain
-4. **Parallax Layers** - Multi-layer depth for 2.5D effect
+2. **Track Selection Menu**
+   - Grid view of all tracks
+   - Lock/unlock states
+   - Preview thumbnails
+   - Best times and star ratings
 
-**Expected Result**: Living, breathing background that showcases the game engine
+3. **Campaign System**
+   - 5-8 tracks in progression order
+   - Unlock criteria (complete previous track)
+   - Overall completion percentage
+   - Championship scoring
 
-### Phase 3 - Landing/Attract Mode (30 min)
-**Arcade-Style Attract Screen**:
-1. **"INSERT COIN" / "PRESS START"** splash screen
-2. **Auto-Play Demo** - Looping track footage or high score replays
-3. **Scrolling High Scores** - Animated ticker showing top 10
-4. **Auto-Advance Logic** - Progress to main menu after 30s or any input
-5. **CRT Scanline Overlay** - Optional retro TV effect
+**Estimated Time**: 2-3 sessions
 
-**Expected Result**: Authentic arcade cabinet experience
+---
 
-### Phase 4 - Polish & Details (Optional)
-**Final Touches**:
-- Sound effects for menu navigation (whoosh, beep, select)
-- Button ripple effects on click
-- Chromatic aberration shader (retro CRT edge distortion)
-- Loading screen animations
-- Responsive design tweaks
+### Phase 10 - Vehicle Damage System (Priority: HIGH)
+**Goal**: Visual and mechanical damage representation
 
-### Implementation Order
-```
-Session Start
-    ↓
-Phase 1: Quick Wins (Main Menu Visual Effects)
-    ↓
-Phase 2: 3D Background (Choose: Car/Track/Tunnel)
-    ↓
-Phase 3: Attract Mode Landing Page
-    ↓
-Phase 4: Polish (if time permits)
-    ↓
-Production Ready ✨
-```
+**Features**:
+1. **Visual Damage Models**
+   - Procedural deformation (dents, scratches)
+   - Damage decals (scuffs, tire marks)
+   - Progressive damage states (pristine → light → heavy → destroyed)
+   - Particle effects (smoke, sparks from damaged areas)
 
-**Target**: AAA-quality presentation that rivals commercial arcade racers
+2. **Damage Meter Integration**
+   - Health bar linked to visual damage
+   - Damage affects physics (steering, speed, handling)
+   - Critical damage warnings
+   - Repair zones on track (optional)
+
+3. **Crash Effects Enhancement**
+   - More dramatic crash particles
+   - Sound effects for different damage types
+   - Camera shake on heavy impacts
+
+**Estimated Time**: 2 sessions
+
+---
+
+### Phase 11 - Environment Overhaul (Priority: MEDIUM)
+**Goal**: AAA-quality tracks and environments
+
+**Track Design**:
+1. **Geometry Enhancement**
+   - More detailed track surfaces
+   - Elevation changes and banking
+   - Jump ramps with proper physics
+   - Loop-de-loops and corkscrews
+
+2. **Track Scenery**
+   - Grandstands with animated crowds
+   - Pit areas and garages
+   - Flags, banners, sponsor boards
+   - Environmental props (trees, rocks, buildings)
+
+**Skybox & Lighting**:
+1. **Dynamic Skybox**
+   - HDR environment maps
+   - Day/night cycle (optional)
+   - Weather variations (clear, overcast, sunset)
+
+2. **Advanced Lighting**
+   - Directional sun shadows
+   - Ambient occlusion
+   - Light shafts (god rays)
+   - Track-specific lighting rigs
+
+**Background Elements**:
+1. **Distant Scenery**
+   - Mountains, cityscape, or desert
+   - Parallax scrolling for depth
+   - Atmospheric fog
+
+2. **Track Details**
+   - Better ground textures
+   - Road markings and curbs
+   - Safety barriers and fencing
+   - Tire walls and catch fences
+
+**Estimated Time**: 3-4 sessions
+
+---
+
+### Phase 12 - Modern Graphics Techniques (Priority: MEDIUM)
+**Goal**: Cutting-edge WebGPU/WebGL2 rendering
+
+**Shader Enhancements**:
+1. **PBR Materials**
+   - Metallic-roughness workflow
+   - Normal mapping for detail
+   - Parallax occlusion mapping
+   - Anisotropic specular (car paint)
+
+2. **Post-Processing Stack**
+   - Bloom (glow on lights/sparks)
+   - Motion blur (speed effect)
+   - Depth of field (cinematic focus)
+   - Color grading (retro arcade look)
+   - SSAO (ambient occlusion)
+
+3. **Dynamic Effects**
+   - Real-time reflections (car paint, windows)
+   - Screen-space reflections
+   - Volumetric fog
+   - Heat shimmer (desert tracks)
+
+**Performance**:
+- Quality presets (Low/Medium/High/Ultra)
+- Dynamic resolution scaling
+- Adaptive detail levels
+- 60fps locked on target hardware
+
+**Estimated Time**: 3 sessions
+
+---
+
+### Phase 13 - Audio & Polish (Priority: MEDIUM)
+**Goal**: Professional audio design and final polish
+
+**Audio**:
+- Menu navigation sounds
+- Impact/collision sound variety
+- Ambient track sounds (crowd, wind)
+- Music tracks (licensed or original)
+- Voice announcements (optional)
+
+**Polish**:
+- Loading screens with tips
+- Tutorial/controls screen
+- Credits screen
+- Social sharing features
+- Achievements system (optional)
+
+**Estimated Time**: 1-2 sessions
+
+---
+
+### Phase 14 - Testing & Optimization (Priority: HIGH)
+**Goal**: Production-ready stability
+
+**Tasks**:
+- Fix remaining test failures
+- Cross-browser testing (Chrome, Firefox, Safari, Edge)
+- Mobile/touch testing
+- Performance profiling
+- Memory leak detection
+- Accessibility audit
+- Beta tester feedback integration
+
+**Estimated Time**: 2 sessions
+
+---
+
+## Beta Release Checklist
+
+- [ ] 5+ playable tracks with progression
+- [ ] Vehicle damage system functional
+- [ ] Enhanced track environments
+- [ ] Modern shader effects
+- [ ] Menu sound effects
+- [ ] All tests passing
+- [ ] 60fps on GTX 1060 / RX 580
+- [ ] Documentation complete
+- [ ] Deployment pipeline ready
+- [ ] Social sharing implemented
+
+**Estimated Total Time to Beta**: 13-17 sessions
+**Target Release**: December 2025
 
 ---
 

@@ -31,11 +31,13 @@ import { GameState } from '../core/GameEngine';
 import type { TimerSystem } from './TimerSystem';
 import type { LeaderboardSystem } from './LeaderboardSystem';
 import type { Vehicle } from '../entities/Vehicle';
+import { CareerProgressionSystem } from './CareerProgressionSystem';
 
 /**
  * UI panel types
  */
 export enum UIPanel {
+  ATTRACT = 'attract',
   MAIN_MENU = 'main-menu',
   CAR_SELECTION = 'car-selection',
   HUD = 'hud',
@@ -54,6 +56,7 @@ export class UISystem {
 
   // UI Elements
   private container: HTMLElement | null = null;
+  private attractScreen: HTMLElement | null = null;
   private mainMenu: HTMLElement | null = null;
   private carSelection: HTMLElement | null = null;
   private hud: HTMLElement | null = null;
@@ -105,6 +108,7 @@ export class UISystem {
     if (this.initialized) return;
 
     this.createUIContainer();
+    this.createAttractScreen();
     this.createMainMenu();
     this.createCarSelection();
     this.createHUD();
@@ -125,6 +129,42 @@ export class UISystem {
     this.container.id = 'ui-container';
     // Styling handled by CSS
     document.body.appendChild(this.container);
+  }
+
+  /**
+   * Creates attract screen (arcade-style landing page)
+   */
+  private createAttractScreen(): void {
+    this.attractScreen = document.createElement('div');
+    this.attractScreen.id = 'attract-screen';
+    this.attractScreen.style.display = 'none';
+
+    this.attractScreen.innerHTML = `
+      <div class="attract-logo">
+        <h1 class="attract-title">HARD DRIVIN'</h1>
+        <div class="attract-subtitle">ARCADE RACING SIMULATOR</div>
+      </div>
+
+      <div class="attract-insert-coin">
+        <div class="coin-blink">INSERT COIN</div>
+        <div class="attract-or">OR</div>
+        <div class="press-start-blink">PRESS ANY KEY</div>
+      </div>
+
+      <div class="attract-high-scores">
+        <h2 class="attract-scores-title">HIGH SCORES</h2>
+        <div id="attract-scores-list" class="attract-scores-list">
+          <!-- Will be populated dynamically -->
+        </div>
+      </div>
+
+      <div class="attract-footer">
+        <div class="attract-footer-text">© 2025 HARD DRIVIN' - RACING GAME</div>
+        <div class="attract-footer-instruction">Auto-start in <span id="attract-countdown">30</span>s</div>
+      </div>
+    `;
+
+    this.container?.appendChild(this.attractScreen);
   }
 
   /**
@@ -294,8 +334,19 @@ export class UISystem {
         <div style="color: #888; margin-bottom: 1rem;">RACE STATISTICS</div>
         <div id="results-stats"></div>
       </div>
+      <div id="unlock-notification" class="unlock-notification" style="display: none;">
+        <div class="unlock-icon">🏁</div>
+        <div class="unlock-text">
+          <div class="unlock-title">NEW TRACK UNLOCKED!</div>
+          <div class="unlock-track-name" id="unlocked-track-name"></div>
+        </div>
+      </div>
       <div class="results-button-group">
-        <button id="btn-race-again" class="btn-primary">RACE AGAIN</button>
+        <button id="btn-next-track" class="btn-primary" style="display: none;">
+          NEXT TRACK
+          <span id="next-track-name" class="btn-subtitle"></span>
+        </button>
+        <button id="btn-race-again" class="btn-secondary">RACE AGAIN</button>
         <button id="btn-main-menu" class="btn-secondary">MAIN MENU</button>
       </div>
     `;
@@ -392,37 +443,115 @@ export class UISystem {
   }
 
   /**
-   * Shows specified UI panel
+   * Shows specified UI panel with smooth transitions
    */
   public showPanel(panel: UIPanel): void {
-    this.hideAll();
-    this.currentPanel = panel;
+    // Get currently visible panel element for fade-out
+    const currentElement = this.getCurrentPanelElement();
 
-    switch (panel) {
+    // Apply fade-out to current panel
+    if (currentElement && currentElement.style.display !== 'none') {
+      currentElement.classList.add('screen-fade-out');
+    }
+
+    // After fade-out completes, switch panels
+    setTimeout(() => {
+      this.hideAll();
+      this.currentPanel = panel;
+
+      let newElement: HTMLElement | null = null;
+
+      switch (panel) {
+        case UIPanel.ATTRACT:
+          if (this.attractScreen) {
+            this.attractScreen.style.display = 'flex';
+            newElement = this.attractScreen;
+          }
+          break;
+        case UIPanel.MAIN_MENU:
+          if (this.mainMenu) {
+            this.mainMenu.style.display = 'flex';
+            newElement = this.mainMenu;
+          }
+          break;
+        case UIPanel.CAR_SELECTION:
+          if (this.carSelection) {
+            this.carSelection.style.display = 'flex';
+            newElement = this.carSelection;
+          }
+          break;
+        case UIPanel.HUD:
+          if (this.hud) {
+            this.hud.style.display = 'block';
+            newElement = this.hud;
+          }
+          break;
+        case UIPanel.PAUSE_MENU:
+          if (this.pauseMenu) {
+            this.pauseMenu.style.display = 'flex';
+            newElement = this.pauseMenu;
+          }
+          break;
+        case UIPanel.RESULTS:
+          if (this.resultsScreen) {
+            this.resultsScreen.style.display = 'flex';
+            newElement = this.resultsScreen;
+          }
+          break;
+        case UIPanel.SETTINGS:
+          if (this.settingsScreen) {
+            this.settingsScreen.style.display = 'flex';
+            newElement = this.settingsScreen;
+          }
+          break;
+        case UIPanel.LEADERBOARD:
+          if (this.leaderboardScreen) {
+            this.leaderboardScreen.style.display = 'flex';
+            newElement = this.leaderboardScreen;
+          }
+          break;
+        case UIPanel.LOADING:
+          // Loading screen handled separately
+          break;
+      }
+
+      // Apply fade-in to new panel
+      if (newElement) {
+        // Reset and trigger fade-in animation
+        newElement.classList.remove('screen-fade-out');
+        newElement.classList.add('screen-fade-in');
+
+        // Clean up animation class after completion
+        setTimeout(() => {
+          newElement?.classList.remove('screen-fade-in');
+        }, 400);
+      }
+    }, currentElement ? 400 : 0); // Wait for fade-out if there's a current panel
+  }
+
+  /**
+   * Gets the currently visible panel element
+   */
+  private getCurrentPanelElement(): HTMLElement | null {
+    switch (this.currentPanel) {
+      case UIPanel.ATTRACT:
+        return this.attractScreen;
       case UIPanel.MAIN_MENU:
-        if (this.mainMenu) this.mainMenu.style.display = 'flex';
-        break;
+        return this.mainMenu;
       case UIPanel.CAR_SELECTION:
-        if (this.carSelection) this.carSelection.style.display = 'flex';
-        break;
+        return this.carSelection;
       case UIPanel.HUD:
-        if (this.hud) this.hud.style.display = 'block';
-        break;
+        return this.hud;
       case UIPanel.PAUSE_MENU:
-        if (this.pauseMenu) this.pauseMenu.style.display = 'flex';
-        break;
+        return this.pauseMenu;
       case UIPanel.RESULTS:
-        if (this.resultsScreen) this.resultsScreen.style.display = 'flex';
-        break;
+        return this.resultsScreen;
       case UIPanel.SETTINGS:
-        if (this.settingsScreen) this.settingsScreen.style.display = 'flex';
-        break;
+        return this.settingsScreen;
       case UIPanel.LEADERBOARD:
-        if (this.leaderboardScreen) this.leaderboardScreen.style.display = 'flex';
-        break;
-      case UIPanel.LOADING:
-        // Loading screen handled separately
-        break;
+        return this.leaderboardScreen;
+      default:
+        return null;
     }
   }
 
@@ -430,6 +559,7 @@ export class UISystem {
    * Hides all UI panels
    */
   private hideAll(): void {
+    if (this.attractScreen) this.attractScreen.style.display = 'none';
     if (this.mainMenu) this.mainMenu.style.display = 'none';
     if (this.carSelection) this.carSelection.style.display = 'none';
     if (this.hud) this.hud.style.display = 'none';
@@ -555,6 +685,45 @@ export class UISystem {
   }
 
   /**
+   * Updates career progression UI elements on results screen
+   * Shows unlock notification and next track button if applicable
+   */
+  public updateCareerProgression(trackUnlocked: boolean): void {
+    const career = CareerProgressionSystem.getInstance();
+    const nextTrack = career.getNextTrack();
+
+    // Show/hide unlock notification
+    const unlockNotification = this.resultsScreen?.querySelector('#unlock-notification') as HTMLElement;
+    const unlockedTrackName = this.resultsScreen?.querySelector('#unlocked-track-name');
+
+    if (trackUnlocked && nextTrack && unlockNotification && unlockedTrackName) {
+      unlockNotification.style.display = 'flex';
+      unlockedTrackName.textContent = nextTrack.name;
+
+      // Trigger animation
+      setTimeout(() => {
+        unlockNotification.classList.add('unlock-pulse');
+      }, 100);
+    } else if (unlockNotification) {
+      unlockNotification.style.display = 'none';
+      unlockNotification.classList.remove('unlock-pulse');
+    }
+
+    // Show/hide next track button
+    const nextTrackButton = this.resultsScreen?.querySelector('#btn-next-track') as HTMLElement;
+    const nextTrackNameSpan = this.resultsScreen?.querySelector('#next-track-name');
+
+    if (nextTrack && nextTrackButton && nextTrackNameSpan) {
+      nextTrackButton.style.display = 'flex';
+      nextTrackNameSpan.textContent = nextTrack.name;
+      console.log('[CareerProgression] Next track available:', nextTrack.name);
+    } else if (nextTrackButton) {
+      nextTrackButton.style.display = 'none';
+      console.log('[CareerProgression] No next track available');
+    }
+  }
+
+  /**
    * Gets ordinal suffix for position (1st, 2nd, 3rd, etc.)
    */
   private getOrdinalSuffix(n: number): string {
@@ -588,6 +757,72 @@ export class UISystem {
   }
 
   /**
+   * Populates attract screen with leaderboard data
+   */
+  public populateAttractScreen(leaderboardSystem: LeaderboardSystem): void {
+    const scoresList = document.getElementById('attract-scores-list');
+    if (!scoresList) return;
+
+    const entries = leaderboardSystem.getLeaderboard();
+
+    if (entries.length === 0) {
+      scoresList.innerHTML = `
+        <div class="attract-score-empty">NO RECORDS YET - BE THE FIRST!</div>
+      `;
+      return;
+    }
+
+    // Show top 5 entries for attract screen
+    const topEntries = entries.slice(0, 5);
+    const scoresHTML = topEntries.map(entry => {
+      const minutes = Math.floor(entry.lapTime / 60000);
+      const seconds = Math.floor((entry.lapTime % 60000) / 1000);
+      const ms = entry.lapTime % 1000;
+      const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+
+      return `
+        <div class="attract-score-row">
+          <span class="attract-score-rank">${entry.rank}</span>
+          <span class="attract-score-name">${entry.playerName}</span>
+          <span class="attract-score-time">${timeStr}</span>
+        </div>
+      `;
+    }).join('');
+
+    scoresList.innerHTML = scoresHTML;
+  }
+
+  /**
+   * Starts attract screen auto-advance countdown
+   * @returns Timer ID that can be used to cancel countdown
+   */
+  public startAttractCountdown(onComplete: () => void, durationSeconds: number = 30): number {
+    const countdownElement = document.getElementById('attract-countdown');
+    let remainingSeconds = durationSeconds;
+
+    const intervalId = window.setInterval(() => {
+      remainingSeconds--;
+      if (countdownElement) {
+        countdownElement.textContent = remainingSeconds.toString();
+      }
+
+      if (remainingSeconds <= 0) {
+        window.clearInterval(intervalId);
+        onComplete();
+      }
+    }, 1000);
+
+    return intervalId;
+  }
+
+  /**
+   * Cancels attract screen countdown
+   */
+  public cancelAttractCountdown(timerId: number): void {
+    window.clearInterval(timerId);
+  }
+
+  /**
    * Disposes UI system and removes DOM elements
    */
   public dispose(): void {
@@ -596,6 +831,7 @@ export class UISystem {
       this.container = null;
     }
 
+    this.attractScreen = null;
     this.mainMenu = null;
     this.carSelection = null;
     this.hud = null;

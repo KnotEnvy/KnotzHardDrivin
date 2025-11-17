@@ -5,6 +5,7 @@ import * as THREE from 'three';
  * Defines the available camera perspectives for the game
  */
 export enum CameraMode {
+  MENU = 'menu',                    // Static menu camera - 3/4 view of vehicle showcase
   FIRST_PERSON = 'first_person',  // Cockpit view - positioned inside vehicle
   CHASE_CAMERA = 'chase_camera',   // Third-person chase camera - behind and above vehicle
   REPLAY = 'replay',                // Cinematic crane shot for crash replays
@@ -55,6 +56,10 @@ export interface CameraTarget {
 export class CameraSystem {
   private camera: THREE.PerspectiveCamera;
   private mode: CameraMode = CameraMode.CHASE_CAMERA; // Default to chase camera for racing
+
+  // Menu camera settings (static 3/4 front view)
+  private menuCameraPosition = new THREE.Vector3(8, 4, 12); // 3/4 front view
+  private menuLookAtPosition = new THREE.Vector3(0, 1.5, 0); // Look at vehicle center
 
   // First-person camera settings
   private fpOffset = new THREE.Vector3(0, 1.2, -0.5); // Inside cockpit (Y: eye height, Z: forward offset)
@@ -139,7 +144,9 @@ export class CameraSystem {
     }
 
     // Update camera based on current mode
-    if (this.mode === CameraMode.FIRST_PERSON) {
+    if (this.mode === CameraMode.MENU) {
+      this.updateMenuCamera(deltaTime);
+    } else if (this.mode === CameraMode.FIRST_PERSON) {
       this.updateFirstPerson(deltaTime, target);
     } else if (this.mode === CameraMode.CHASE_CAMERA) {
       this.updateChaseCamera(deltaTime, target);
@@ -173,6 +180,28 @@ export class CameraSystem {
     } else {
       this.smoothLookAt.copy(target.position).add(this.replayLookAtOffset);
     }
+  }
+
+  /**
+   * Update menu camera (static 3/4 showcase view)
+   *
+   * Behavior:
+   * - Position: Fixed 3/4 front view (8, 4, 12) for vehicle showcase
+   * - Look-at: Vehicle center (0, 1.5, 0) for optimal framing
+   * - Smoothing: None - static position for menu stability
+   *
+   * This camera mode is designed for the main menu background where
+   * the vehicle rotates slowly on a pedestal. Camera remains fixed
+   * to provide a stable, professional showcase view.
+   *
+   * Performance: ~0.01ms (minimal calculations)
+   */
+  private updateMenuCamera(deltaTime: number): void {
+    // Set camera to fixed position (3/4 front view)
+    this.camera.position.copy(this.menuCameraPosition);
+
+    // Look at vehicle center (slightly elevated for better framing)
+    this.camera.lookAt(this.menuLookAtPosition);
   }
 
   /**

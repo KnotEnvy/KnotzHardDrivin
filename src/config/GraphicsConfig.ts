@@ -40,6 +40,7 @@ export interface GraphicsSettings {
   // Post-processing
   bloom: boolean;                 // Bloom effect
   motionBlur: boolean;            // Motion blur effect
+  crtEffects: boolean;            // CRT shader effects (scanlines, chromatic aberration, vignette)
 
   // LOD settings
   lodBias: number;                // LOD distance multiplier (lower = more aggressive culling)
@@ -67,6 +68,7 @@ export const LOW_QUALITY: GraphicsSettings = {
   physicsIterations: 4,
   bloom: false,
   motionBlur: false,
+  crtEffects: false, // Disable CRT effects for low-end hardware
   lodBias: 0.5,
   maxDrawDistance: 300,
 };
@@ -87,6 +89,7 @@ export const MEDIUM_QUALITY: GraphicsSettings = {
   physicsIterations: 6,
   bloom: true,
   motionBlur: false,
+  crtEffects: true, // Enable CRT effects for menu screens
   lodBias: 1.0,
   maxDrawDistance: 500,
 };
@@ -107,6 +110,7 @@ export const HIGH_QUALITY: GraphicsSettings = {
   physicsIterations: 8,
   bloom: true,
   motionBlur: true,
+  crtEffects: true, // Full CRT effects enabled
   lodBias: 1.5,
   maxDrawDistance: 800,
 };
@@ -125,6 +129,7 @@ export const ULTRA_QUALITY: GraphicsSettings = {
   physicsIterations: 10,
   bloom: true,
   motionBlur: true,
+  crtEffects: true, // Maximum CRT effects
   lodBias: 2.0,
   maxDrawDistance: 1000,
 };
@@ -245,6 +250,7 @@ export function validateSettings(settings: Partial<GraphicsSettings>): GraphicsS
     physicsIterations: clamp(settings.physicsIterations ?? base.physicsIterations, 1, 20),
     bloom: settings.bloom ?? base.bloom,
     motionBlur: settings.motionBlur ?? base.motionBlur,
+    crtEffects: settings.crtEffects ?? base.crtEffects,
     lodBias: clamp(settings.lodBias ?? base.lodBias, 0.1, 3.0),
     maxDrawDistance: clamp(settings.maxDrawDistance ?? base.maxDrawDistance, 100, 2000),
   };

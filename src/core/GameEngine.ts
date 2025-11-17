@@ -21,6 +21,8 @@ import { AudioSystem } from '../systems/AudioSystem';
 import { EngineSoundManager } from '../systems/EngineSoundManager';
 import { UISystem, UIPanel } from '../systems/UISystem';
 import { CrashReplayUI } from '../systems/CrashReplayUI';
+import { MenuBackgroundSystem } from '../systems/MenuBackgroundSystem';
+import { CareerProgressionSystem } from '../systems/CareerProgressionSystem';
 import * as THREE from 'three';
 
 /**
@@ -28,6 +30,7 @@ import * as THREE from 'three';
  */
 export enum GameState {
   LOADING = 'loading',
+  ATTRACT = 'attract',
   MENU = 'menu',
   PLAYING = 'playing',
   PAUSED = 'paused',
@@ -79,6 +82,9 @@ export class GameEngine {
   private audioSystem: AudioSystem | null = null;
   private crashReplayUI: CrashReplayUI | null = null;
   private engineSoundManager: EngineSoundManager | null = null;
+
+  // Phase 8: Menu Background System
+  private menuBackground: MenuBackgroundSystem | null = null;
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
@@ -152,12 +158,12 @@ export class GameEngine {
       this.running = true;
       this.lastTime = performance.now();
 
-      // Transition from LOADING to MENU
-      this.setState(GameState.MENU);
+      // Transition from LOADING to ATTRACT (arcade-style landing page)
+      this.setState(GameState.ATTRACT);
 
-      // Show main menu
+      // Show attract screen
       if (this.uiSystem) {
-        this.uiSystem.showPanel(UIPanel.MAIN_MENU);
+        this.uiSystem.showPanel(UIPanel.ATTRACT);
       }
 
       this.gameLoop();
@@ -308,7 +314,10 @@ export class GameEngine {
     // Update systems based on current state
     switch (this.state) {
       case GameState.MENU:
-        // Update menu animations
+        // Update menu 3D background (rotating vehicle, particles)
+        if (this.menuBackground) {
+          this.menuBackground.update(deltaTime);
+        }
         break;
       case GameState.PLAYING:
         // Update gameplay systems
@@ -489,9 +498,12 @@ export class GameEngine {
    * Renders the current frame.
    */
   private render(): void {
-    // Update camera to follow vehicle (if available)
-    // FIX: Also update camera during REPLAY so it follows the crash cinematically
-    if (this.vehicle && (this.state === GameState.PLAYING || this.state === GameState.REPLAY)) {
+    // Update camera based on game state
+    if (this.state === GameState.MENU) {
+      // Menu camera: static 3/4 view of rotating vehicle
+      this.cameraSystem.update(0.016, null);
+    } else if (this.vehicle && (this.state === GameState.PLAYING || this.state === GameState.REPLAY)) {
+      // Gameplay/Replay camera: follow vehicle
       const transform = this.vehicle.getTransform();
       this.cameraSystem.update(0.016, {
         position: transform.position,
@@ -504,7 +516,13 @@ export class GameEngine {
     this.sceneManager.update(0.016);
 
     // Render the scene
-    this.sceneManager.render();
+    // Use menu background rendering if in MENU/ATTRACT state (includes CRT post-processing)
+    if ((this.state === GameState.MENU || this.state === GameState.ATTRACT) && this.menuBackground) {
+      this.menuBackground.render();
+    } else {
+      // Normal scene rendering for gameplay
+      this.sceneManager.render();
+    }
   }
 
   /**
@@ -586,12 +604,47 @@ export class GameEngine {
       case GameState.LOADING:
         // Initialize loading screen
         break;
+      case GameState.ATTRACT:
+        // Populate attract screen with leaderboard data
+        if (this.uiSystem) {
+          this.uiSystem.populateAttractScreen(this.leaderboardSystem);
+        }
+        // Setup attract mode event handlers
+        this.setupAttractModeHandlers();
+        break;
       case GameState.MENU:
-        // Setup menu
+        // Setup menu 3D background
+        if (!this.menuBackground) {
+          this.menuBackground = new MenuBackgroundSystem(
+            this.sceneManager.scene,
+            this.sceneManager.renderer,
+            this.sceneManager.camera
+          );
+          this.menuBackground.init();
+
+          // Enable CRT post-processing based on quality settings
+          // Performance optimization handled by PostProcessingSystem
+          this.menuBackground.setPostProcessingQuality('medium');
+
+          // Register resize callback for post-processing
+          this.sceneManager.setResizeCallback((width, height) => {
+            this.menuBackground?.resize(width, height);
+          });
+
+          console.log('[GameEngine] Menu background initialized with CRT effects');
+        }
+
+        // Set camera to menu mode (static 3/4 view)
+        this.cameraSystem.setMode(CameraMode.MENU);
+        console.log('[GameEngine] Camera set to MENU mode');
         break;
       case GameState.PLAYING:
         // Start race timer, enable input
         this.accumulator = 0; // Reset accumulator
+
+        // Reset camera to chase mode when starting race
+        this.cameraSystem.setMode(CameraMode.CHASE_CAMERA);
+        console.log('[GameEngine] Camera reset to CHASE_CAMERA for gameplay');
 
         // Start or resume timer (Phase 5A)
         if (this.timerSystem.isPaused()) {
@@ -609,6 +662,8 @@ export class GameEngine {
         // Show pause menu
         // Pause timer (Phase 5A)
         this.timerSystem.pause();
+        // Setup keyboard navigation for pause menu
+        this.setupPauseMenuKeyboardNav();
         break;
       case GameState.CRASHED:
         // Crash effects triggered, replay is already set up in handleCrashReplayTrigger
@@ -698,6 +753,27 @@ export class GameEngine {
         // Show results screen with collected data
         if (this.uiSystem) {
           this.uiSystem.showResults(finalTimeFormatted, resultsStats);
+
+          // Career Progression: Record completion and check for unlocks
+          const careerSystem = CareerProgressionSystem.getInstance();
+          const currentTrack = careerSystem.getCurrentTrack();
+
+          if (currentTrack) {
+            const trackUnlocked = careerSystem.recordCompletion(
+              currentTrack.id,
+              bestLapTime,
+              finalRaceTime,
+              stats.totalCrashes
+            );
+
+            // Update UI to show unlock notification and next track button
+            this.uiSystem.updateCareerProgression(trackUnlocked);
+
+            console.log('[CareerProgression] Race completion recorded for:', currentTrack.name);
+            if (trackUnlocked) {
+              console.log('[CareerProgression] New track unlocked!');
+            }
+          }
         }
 
         console.log('Results screen displayed with race data');
@@ -715,8 +791,17 @@ export class GameEngine {
       case GameState.LOADING:
         // Cleanup loading screen
         break;
+      case GameState.ATTRACT:
+        // Cleanup attract mode event handlers
+        this.cleanupAttractModeHandlers();
+        break;
       case GameState.MENU:
-        // Cleanup menu
+        // Cleanup menu 3D background
+        if (this.menuBackground) {
+          this.menuBackground.dispose();
+          this.menuBackground = null;
+          console.log('[GameEngine] Menu background disposed');
+        }
         break;
       case GameState.PLAYING:
         // Only fully clean up when going to MENU or RESULTS (end of race)
@@ -765,6 +850,8 @@ export class GameEngine {
         break;
       case GameState.PAUSED:
         // Hide pause menu
+        // Cleanup keyboard navigation
+        this.cleanupPauseMenuKeyboardNav();
         break;
       case GameState.CRASHED:
         // Cleanup crash effects (brief state, most cleanup happens in REPLAY state)
@@ -982,6 +1069,26 @@ export class GameEngine {
       this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
     });
 
+    // Results - Next Track button
+    this.uiSystem.onButtonClick('btn-next-track', async () => {
+      console.log('Next track button clicked');
+      const careerSystem = CareerProgressionSystem.getInstance();
+      const nextTrack = careerSystem.getNextTrack();
+
+      if (nextTrack) {
+        // Set next track as current
+        careerSystem.setCurrentTrack(nextTrack.id);
+        console.log('[CareerProgression] Loading next track:', nextTrack.name);
+
+        // Initialize race with new track
+        await this.initializeRace();
+        this.setState(GameState.PLAYING);
+        this.uiSystem?.showPanel(UIPanel.HUD);
+      } else {
+        console.warn('[CareerProgression] No next track available');
+      }
+    });
+
     console.log('UI event handlers set up');
   }
 
@@ -1022,6 +1129,180 @@ export class GameEngine {
         listContainer.appendChild(entryDiv);
       });
     }
+  }
+
+  /**
+   * Attract mode countdown timer ID
+   */
+  private attractCountdownTimer: number | null = null;
+
+  /**
+   * Attract mode key handler
+   */
+  private attractKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /**
+   * Attract mode gamepad handler interval
+   */
+  private attractGamepadInterval: number | null = null;
+
+  /**
+   * Pause menu keyboard navigation - current focused button index
+   */
+  private pauseMenuFocusIndex: number = 0;
+
+  /**
+   * Pause menu keyboard navigation handler
+   */
+  private pauseMenuKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  /**
+   * Sets up attract mode event handlers
+   */
+  private setupAttractModeHandlers(): void {
+    if (!this.uiSystem) return;
+
+    // Auto-advance to main menu after 30 seconds
+    this.attractCountdownTimer = this.uiSystem.startAttractCountdown(() => {
+      console.log('Attract mode timeout - advancing to main menu');
+      this.setState(GameState.MENU);
+      this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+    }, 30);
+
+    // Any key press advances to main menu
+    this.attractKeyHandler = (e: KeyboardEvent) => {
+      e.preventDefault();
+      console.log('Key pressed in attract mode - advancing to main menu');
+
+      // Add flash effect to attract screen
+      const attractScreen = document.getElementById('attract-screen');
+      if (attractScreen) {
+        attractScreen.classList.add('key-pressed');
+        // Wait for animation to complete before transitioning
+        setTimeout(() => {
+          this.setState(GameState.MENU);
+          this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+          attractScreen.classList.remove('key-pressed');
+        }, 200); // Flash halfway through 0.4s animation for snappy feel
+      } else {
+        // Fallback if attract screen not found
+        this.setState(GameState.MENU);
+        this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+      }
+    };
+    window.addEventListener('keydown', this.attractKeyHandler);
+
+    // Any gamepad button advances to main menu
+    this.attractGamepadInterval = window.setInterval(() => {
+      const gamepads = navigator.getGamepads();
+      for (const gamepad of gamepads) {
+        if (gamepad) {
+          for (const button of gamepad.buttons) {
+            if (button.pressed) {
+              console.log('Gamepad button pressed in attract mode - advancing to main menu');
+
+              // Add flash effect to attract screen
+              const attractScreen = document.getElementById('attract-screen');
+              if (attractScreen) {
+                attractScreen.classList.add('key-pressed');
+                // Wait for animation to complete before transitioning
+                setTimeout(() => {
+                  this.setState(GameState.MENU);
+                  this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+                  attractScreen.classList.remove('key-pressed');
+                }, 200); // Flash halfway through 0.4s animation for snappy feel
+              } else {
+                // Fallback if attract screen not found
+                this.setState(GameState.MENU);
+                this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+              }
+              return;
+            }
+          }
+        }
+      }
+    }, 100);
+  }
+
+  /**
+   * Cleans up attract mode event handlers
+   */
+  private cleanupAttractModeHandlers(): void {
+    // Cancel countdown timer
+    if (this.attractCountdownTimer !== null && this.uiSystem) {
+      this.uiSystem.cancelAttractCountdown(this.attractCountdownTimer);
+      this.attractCountdownTimer = null;
+    }
+
+    // Remove key event listener
+    if (this.attractKeyHandler) {
+      window.removeEventListener('keydown', this.attractKeyHandler);
+      this.attractKeyHandler = null;
+    }
+
+    // Clear gamepad polling interval
+    if (this.attractGamepadInterval !== null) {
+      window.clearInterval(this.attractGamepadInterval);
+      this.attractGamepadInterval = null;
+    }
+  }
+
+  /**
+   * Sets up pause menu keyboard navigation (arrow keys/WASD)
+   */
+  private setupPauseMenuKeyboardNav(): void {
+    const pauseButtons = [
+      document.getElementById('btn-resume'),
+      document.getElementById('btn-restart'),
+      document.getElementById('btn-quit')
+    ].filter(btn => btn !== null) as HTMLElement[];
+
+    if (pauseButtons.length === 0) return;
+
+    // Reset focus index
+    this.pauseMenuFocusIndex = 0;
+
+    // Focus first button
+    pauseButtons[0]?.focus();
+
+    // Keyboard navigation handler
+    this.pauseMenuKeyHandler = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+
+      // Navigate up: ArrowUp or W
+      if (key === 'arrowup' || key === 'w') {
+        e.preventDefault();
+        this.pauseMenuFocusIndex = (this.pauseMenuFocusIndex - 1 + pauseButtons.length) % pauseButtons.length;
+        pauseButtons[this.pauseMenuFocusIndex]?.focus();
+      }
+
+      // Navigate down: ArrowDown or S
+      if (key === 'arrowdown' || key === 's') {
+        e.preventDefault();
+        this.pauseMenuFocusIndex = (this.pauseMenuFocusIndex + 1) % pauseButtons.length;
+        pauseButtons[this.pauseMenuFocusIndex]?.focus();
+      }
+
+      // Activate: Enter or Space
+      if (key === 'enter' || key === ' ') {
+        e.preventDefault();
+        pauseButtons[this.pauseMenuFocusIndex]?.click();
+      }
+    };
+
+    window.addEventListener('keydown', this.pauseMenuKeyHandler);
+    console.log('[GameEngine] Pause menu keyboard navigation enabled (↑↓/WS to navigate, Enter/Space to select)');
+  }
+
+  /**
+   * Cleans up pause menu keyboard navigation
+   */
+  private cleanupPauseMenuKeyboardNav(): void {
+    if (this.pauseMenuKeyHandler) {
+      window.removeEventListener('keydown', this.pauseMenuKeyHandler);
+      this.pauseMenuKeyHandler = null;
+    }
+    this.pauseMenuFocusIndex = 0;
   }
 
   /**
@@ -1261,7 +1542,13 @@ export class GameEngine {
       console.log('Initializing race...');
 
       // Load track data (with leading slash for Vite public folder)
-      const trackData = await this.loadTrackData('/assets/tracks/track01.json');
+      // Load track from career progression system
+      const careerSystem = CareerProgressionSystem.getInstance();
+      const currentTrack = careerSystem.getCurrentTrack();
+      const trackPath = currentTrack ? currentTrack.path : '/assets/tracks/track01.json';
+
+      console.log('[CareerProgression] Loading track:', currentTrack?.name || 'Default Track', 'from', trackPath);
+      const trackData = await this.loadTrackData(trackPath);
 
       // FIX: Check if state changed during async operation to prevent race condition
       if (this.state !== GameState.PLAYING) {
@@ -1397,6 +1684,12 @@ export class GameEngine {
     if (this.uiSystem) {
       this.uiSystem.dispose();
       this.uiSystem = null;
+    }
+
+    // Cleanup Phase 8: Menu Background
+    if (this.menuBackground) {
+      this.menuBackground.dispose();
+      this.menuBackground = null;
     }
 
     // Cleanup Phase 6: Ghost systems

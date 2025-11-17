@@ -39,6 +39,9 @@ export class SceneManager {
   // Store bound resize handler for proper cleanup
   private boundResizeHandler: () => void;
 
+  // Optional resize callback for external systems (e.g., MenuBackgroundSystem)
+  private onResizeCallback?: (width: number, height: number) => void;
+
   constructor(canvas: HTMLCanvasElement, qualitySettings?: {
     shadowMapSize?: number;
     antialiasing?: boolean;
@@ -249,6 +252,26 @@ export class SceneManager {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Notify external systems (e.g., post-processing)
+    if (this.onResizeCallback) {
+      this.onResizeCallback(window.innerWidth, window.innerHeight);
+    }
+  }
+
+  /**
+   * Set resize callback for external systems
+   * Used by MenuBackgroundSystem to update post-processing render targets
+   */
+  setResizeCallback(callback: (width: number, height: number) => void): void {
+    this.onResizeCallback = callback;
+  }
+
+  /**
+   * Clear resize callback
+   */
+  clearResizeCallback(): void {
+    this.onResizeCallback = undefined;
   }
 
   /**

@@ -29,13 +29,41 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: transparent; /* Changed from #000000 to show 3D car */
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
 }
 
-/* Background animated pattern (optional luxury) */
+/* ========================================
+   VIGNETTE OVERLAY FOR 3D DEPTH EFFECT
+   Radial gradient darkens edges for cinematic focus
+   ======================================== */
+
+/* Vignette overlay - positioned behind UI but in front of 3D scene */
+.menu-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 85%,
+    rgba(0, 0, 0, 0.05) 95%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+/* ========================================
+   PHASE 1 VISUAL ENHANCEMENTS
+   Animated gradient background with color-shifting
+   ======================================== */
+
+/* Animated gradient background layer */
 #main-menu::before {
   content: '';
   position: absolute;
@@ -43,25 +71,90 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255, 0, 85, 0.03) 0%, transparent 50%);
+  background: linear-gradient(
+    135deg,
+    #000000 0%,
+    #001a0f 20%,
+    #000a14 40%,
+    #0a0014 60%,
+    #001a0f 80%,
+    #000000 100%
+  );
+  background-size: 400% 400%;
   pointer-events: none;
-  animation: menuBackgroundShift 20s ease-in-out infinite;
+  animation: gradientShift 20s ease-in-out infinite;
+  opacity: 0.15; /* Reduced from 0.6 to let 3D car show through */
+  z-index: 1;
 }
 
-@keyframes menuBackgroundShift {
-  0%, 100% {
-    background:
-      radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(255, 0, 85, 0.03) 0%, transparent 50%);
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 50% 75%;
   }
   50% {
-    background:
-      radial-gradient(circle at 80% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 20% 80%, rgba(255, 0, 85, 0.03) 0%, transparent 50%);
+    background-position: 100% 50%;
+  }
+  75% {
+    background-position: 50% 25%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
+
+/* Speed lines animation layer */
+#main-menu::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 8px,
+      rgba(0, 255, 136, 0.05) 8px,
+      rgba(0, 255, 136, 0.05) 10px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px,
+      transparent 20px,
+      rgba(0, 255, 136, 0.03) 20px,
+      rgba(0, 255, 136, 0.03) 21px
+    );
+  background-size: 100% 100%, 200% 200%;
+  background-position: center, 0% 0%;
+  pointer-events: none;
+  animation: speedLines 3s linear infinite;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+@keyframes speedLines {
+  0% {
+    background-position: center, 0% 0%;
+    opacity: 0.3;
+  }
+  50% {
+    background-position: center, 100% 100%;
+    opacity: 0.6;
+  }
+  100% {
+    background-position: center, 200% 200%;
+    opacity: 0.3;
+  }
+}
+
+/* ========================================
+   ENHANCED LOGO TREATMENT
+   Metallic chrome shader, scanlines, glitch effects
+   ======================================== */
 
 /* Main menu title */
 #main-menu h1 {
@@ -69,17 +162,102 @@
   z-index: 2;
   margin-bottom: var(--spacing-3xl);
   text-align: center;
-  animation: panelSlideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation:
+    panelSlideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+    logoGlow 4s ease-in-out infinite;
   letter-spacing: 0.08em;
-  color: #00ff88;
-  text-shadow:
-    0 0 10px rgba(0, 255, 136, 1),
-    0 0 20px rgba(0, 255, 136, 1),
-    0 0 30px rgba(0, 255, 136, 1),
-    0 0 40px rgba(0, 255, 136, 0.8),
-    0 0 70px rgba(0, 255, 136, 0.6),
-    0 0 100px rgba(0, 255, 136, 0.4),
-    0 0 150px rgba(0, 255, 136, 0.2);
+
+  /* Metallic chrome gradient text */
+  background: linear-gradient(
+    180deg,
+    #00ff88 0%,
+    #00ffbb 20%,
+    #00ff88 40%,
+    #00cc6a 60%,
+    #00ff88 80%,
+    #00ffbb 100%
+  );
+  background-size: 100% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    panelSlideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+    logoGlow 4s ease-in-out infinite,
+    chromeShine 3s linear infinite;
+
+  /* Multi-layer glow shadow - reduced intensity */
+  filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.8))
+          drop-shadow(0 0 10px rgba(0, 255, 136, 0.6))
+          drop-shadow(0 0 20px rgba(0, 255, 136, 0.4))
+          drop-shadow(0 0 40px rgba(0, 255, 136, 0.2));
+}
+
+/* Scanline overlay on title */
+#main-menu h1::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -10%;
+  width: 120%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 255, 136, 0.1) 2px,
+    rgba(0, 255, 136, 0.1) 4px
+  );
+  pointer-events: none;
+  animation: scanlineScroll 8s linear infinite;
+  z-index: 3;
+}
+
+/* Chrome shine animation */
+@keyframes chromeShine {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 0% 200%;
+  }
+}
+
+/* Scanline scroll animation */
+@keyframes scanlineScroll {
+  0% {
+    transform: translateY(0%);
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0.3;
+  }
+}
+
+/* Logo pulsing glow animation */
+@keyframes logoGlow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 10px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 20px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 30px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 40px rgba(0, 255, 136, 0.8))
+      drop-shadow(0 0 70px rgba(0, 255, 136, 0.6))
+      drop-shadow(0 0 100px rgba(0, 255, 136, 0.4));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 15px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 30px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 45px rgba(0, 255, 136, 1))
+      drop-shadow(0 0 60px rgba(0, 255, 136, 0.9))
+      drop-shadow(0 0 100px rgba(0, 255, 136, 0.7))
+      drop-shadow(0 0 150px rgba(0, 255, 136, 0.5));
+  }
 }
 
 /* Main menu button group */
@@ -110,6 +288,11 @@
   text-align: center;
 }
 
+/* ========================================
+   PULSING START BUTTON
+   Intense breathing glow effect to draw attention
+   ======================================== */
+
 /* Primary menu button (START RACE) */
 #main-menu .menu-button.btn-primary {
   background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
@@ -118,9 +301,67 @@
     0 0 20px rgba(0, 255, 136, 0.8),
     0 0 40px rgba(0, 255, 136, 0.5),
     0 0 60px rgba(0, 255, 136, 0.3);
-  animation: panelSlideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  animation-delay: 0.1s;
+  animation:
+    panelSlideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+    buttonBreathingGlow 2.5s ease-in-out infinite 0.8s;
+  animation-delay: 0.1s, 0.8s;
   border: 2px solid #00ff88;
+  position: relative;
+  overflow: visible;
+}
+
+/* Pulsing glow ring around START button */
+#main-menu .menu-button.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 2px solid rgba(0, 255, 136, 0.6);
+  animation: pulseRing 2.5s ease-in-out infinite 0.8s;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Breathing glow animation for START button */
+@keyframes buttonBreathingGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(0, 255, 136, 0.8),
+      0 0 40px rgba(0, 255, 136, 0.5),
+      0 0 60px rgba(0, 255, 136, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 40px rgba(0, 255, 136, 1),
+      0 0 80px rgba(0, 255, 136, 0.8),
+      0 0 120px rgba(0, 255, 136, 0.6),
+      0 0 160px rgba(0, 255, 136, 0.4);
+    transform: scale(1.03);
+  }
+}
+
+/* Pulse ring animation */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+    border-width: 2px;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0;
+    border-width: 1px;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+    border-width: 1px;
+  }
 }
 
 #main-menu .menu-button.btn-primary:hover {
@@ -203,7 +444,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: transparent;
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -389,6 +630,7 @@
   justify-content: center;
   pointer-events: all;
   z-index: var(--z-modal);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -484,7 +726,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: transparent; /* Changed from #000000 to show 3D car */
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -656,6 +898,111 @@
   box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
 }
 
+/* Next Track Button */
+#btn-next-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(135deg, #ff00aa 0%, #aa0055 100%);
+  color: #fff;
+  border: 2px solid #ff00aa;
+  box-shadow:
+    0 0 20px rgba(255, 0, 170, 0.5),
+    0 0 40px rgba(255, 0, 170, 0.3);
+}
+
+#btn-next-track:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 0 30px rgba(255, 0, 170, 0.7),
+    0 0 60px rgba(255, 0, 170, 0.5);
+}
+
+#btn-next-track .btn-subtitle {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-normal);
+  opacity: 0.9;
+  letter-spacing: 0.05em;
+}
+
+/* Unlock Notification */
+.unlock-notification {
+  display: none;
+  align-items: center;
+  gap: var(--spacing-lg);
+  background: linear-gradient(135deg, rgba(255, 0, 170, 0.15) 0%, rgba(170, 0, 85, 0.15) 100%);
+  border: 2px solid #ff00aa;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  box-shadow:
+    0 0 20px rgba(255, 0, 170, 0.3),
+    inset 0 0 30px rgba(255, 0, 170, 0.1);
+  animation: unlockSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.unlock-notification.unlock-pulse {
+  animation:
+    unlockSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+    unlockPulse 2s ease-in-out infinite;
+  animation-delay: 0s, 0.5s;
+}
+
+.unlock-icon {
+  font-size: 3rem;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 170, 0.8));
+}
+
+.unlock-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.unlock-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: #ff00aa;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow:
+    0 0 10px rgba(255, 0, 170, 0.8),
+    0 0 20px rgba(255, 0, 170, 0.4);
+}
+
+.unlock-track-name {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Unlock Notification Animations */
+@keyframes unlockSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes unlockPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(255, 0, 170, 0.3),
+      inset 0 0 30px rgba(255, 0, 170, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 0, 170, 0.5),
+      inset 0 0 40px rgba(255, 0, 170, 0.2);
+  }
+}
+
 /* ===========================
    RESPONSIVE DESIGN
    =========================== */
@@ -818,7 +1165,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: transparent;
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -968,7 +1315,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: transparent;
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -1073,4 +1420,377 @@
   cursor: pointer;
   transition: all var(--transition-base);
   min-width: 200px;
+}
+
+/* ========================================
+   SCREEN TRANSITIONS
+   Fade to black with speed blur between menus
+   ======================================== */
+
+/* Fade out animation for screen transitions */
+.screen-fade-out {
+  animation: fadeOutBlur 0.4s ease-out forwards;
+}
+
+/* Fade in animation for screen transitions */
+.screen-fade-in {
+  animation: fadeInUnblur 0.4s ease-in forwards;
+}
+
+@keyframes fadeOutBlur {
+  0% {
+    opacity: 1;
+    filter: blur(0px) brightness(1);
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(10px) brightness(0.5);
+    transform: scale(0.95);
+  }
+}
+
+@keyframes fadeInUnblur {
+  0% {
+    opacity: 0;
+    filter: blur(10px) brightness(0.5);
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px) brightness(1);
+    transform: scale(1);
+  }
+}
+
+/* Glitch effect for occasional logo flair */
+@keyframes glitchEffect {
+  0%, 90%, 100% {
+    transform: translate(0, 0);
+    text-shadow: none;
+  }
+  20% {
+    transform: translate(-2px, 2px);
+    text-shadow: 2px -2px 0 #ff00ff, -2px 2px 0 #00ffff;
+  }
+  40% {
+    transform: translate(2px, -2px);
+    text-shadow: -2px 2px 0 #ff00ff, 2px -2px 0 #00ffff;
+  }
+  60% {
+    transform: translate(-1px, 1px);
+    text-shadow: 1px -1px 0 #ff00ff, -1px 1px 0 #00ffff;
+  }
+  80% {
+    transform: translate(1px, -1px);
+    text-shadow: -1px 1px 0 #ff00ff, 1px -1px 0 #00ffff;
+  }
+}
+
+/* Optional glitch trigger on hover (subtle) */
+#main-menu h1:hover {
+  animation:
+    panelSlideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+    logoGlow 4s ease-in-out infinite,
+    chromeShine 3s linear infinite,
+    glitchEffect 0.3s ease-in-out;
+}
+
+/* ===========================
+   ATTRACT SCREEN (PHASE 3)
+   Arcade-style landing page
+   =========================== */
+
+#attract-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent; /* Changed from #000000 to show 3D car */
+  pointer-events: all;
+  z-index: var(--z-modal);
+  padding: var(--spacing-xl);
+}
+
+/* Animated gradient background (same as main menu) */
+#attract-screen::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    #000000 0%,
+    #001a0f 20%,
+    #000a14 40%,
+    #0a0014 60%,
+    #001a0f 80%,
+    #000000 100%
+  );
+  background-size: 400% 400%;
+  pointer-events: none;
+  animation: gradientShift 20s ease-in-out infinite;
+  opacity: 0.15; /* Reduced from 0.6 to match main menu */
+  z-index: 1;
+}
+
+/* CRT scanline overlay */
+#attract-screen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 255, 136, 0.03) 0px,
+    rgba(0, 255, 136, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.5;
+}
+
+/* Logo section */
+.attract-logo {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.attract-title {
+  font-family: var(--font-heading);
+  font-size: clamp(3.5rem, 8vw, 6rem);
+  font-weight: 900;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin: 0;
+  padding: 0;
+
+  /* Multi-layer glow (same as main menu) */
+  text-shadow:
+    0 0 10px rgba(0, 255, 136, 0.8),
+    0 0 20px rgba(0, 255, 136, 0.6),
+    0 0 30px rgba(0, 255, 136, 0.4),
+    0 0 40px rgba(0, 255, 136, 0.3),
+    0 0 60px rgba(0, 255, 136, 0.2),
+    0 0 80px rgba(0, 255, 136, 0.1),
+    0 0 100px rgba(0, 255, 136, 0.05);
+
+  animation:
+    logoGlow 4s ease-in-out infinite,
+    chromeShine 3s linear infinite;
+}
+
+.attract-subtitle {
+  font-family: var(--font-body);
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  margin-top: var(--spacing-sm);
+  text-shadow:
+    0 0 10px rgba(255, 0, 85, 0.6),
+    0 0 20px rgba(255, 0, 85, 0.4);
+}
+
+/* Insert coin / press start section */
+.attract-insert-coin {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin: var(--spacing-xl) 0;
+}
+
+.coin-blink,
+.press-start-blink {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 900;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  text-shadow:
+    0 0 10px rgba(0, 255, 136, 0.8),
+    0 0 20px rgba(0, 255, 136, 0.6),
+    0 0 30px rgba(0, 255, 136, 0.4);
+  animation: coinBlink 1.5s ease-in-out infinite;
+}
+
+.attract-or {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: var(--spacing-sm) 0;
+  letter-spacing: 0.2em;
+}
+
+/* Blinking animation */
+@keyframes coinBlink {
+  0%, 100% {
+    opacity: 1;
+    text-shadow:
+      0 0 10px rgba(0, 255, 136, 0.8),
+      0 0 20px rgba(0, 255, 136, 0.6),
+      0 0 30px rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    opacity: 0.3;
+    text-shadow:
+      0 0 5px rgba(0, 255, 136, 0.4),
+      0 0 10px rgba(0, 255, 136, 0.3);
+  }
+}
+
+/* High scores section */
+.attract-high-scores {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 600px;
+  margin: var(--spacing-xl) 0;
+}
+
+.attract-scores-title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-weight: 900;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-bottom: var(--spacing-md);
+  text-shadow:
+    0 0 10px rgba(255, 0, 85, 0.6),
+    0 0 20px rgba(255, 0, 85, 0.4);
+}
+
+.attract-scores-list {
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-md);
+  box-shadow:
+    0 0 20px rgba(0, 255, 136, 0.3),
+    inset 0 0 20px rgba(0, 255, 136, 0.1);
+}
+
+.attract-score-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: var(--spacing-md);
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid rgba(0, 255, 136, 0.2);
+  font-family: var(--font-mono);
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  color: var(--color-text);
+  transition: all 0.2s ease;
+}
+
+.attract-score-row:last-child {
+  border-bottom: none;
+}
+
+.attract-score-row:hover {
+  background: rgba(0, 255, 136, 0.1);
+  transform: translateX(4px);
+}
+
+.attract-score-rank {
+  color: var(--color-accent);
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+}
+
+.attract-score-name {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.attract-score-time {
+  color: var(--color-text);
+  font-weight: 700;
+  text-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+}
+
+.attract-score-empty {
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: var(--spacing-lg);
+  animation: coinBlink 2s ease-in-out infinite;
+}
+
+/* Footer section */
+.attract-footer {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin-top: auto;
+  padding-top: var(--spacing-xl);
+}
+
+.attract-footer-text {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--spacing-sm);
+}
+
+.attract-footer-instruction {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-text);
+  letter-spacing: 0.05em;
+}
+
+#attract-countdown {
+  color: var(--color-accent);
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(255, 0, 85, 0.6);
+}
+
+/* ========================================
+   ATTRACT SCREEN KEY PRESS FEEDBACK
+   Flash animation when user presses any key
+   ======================================== */
+
+/* Flash animation - quick bright flash then fade */
+@keyframes attractKeyPressFlash {
+  0% {
+    background: transparent;
+  }
+  30% {
+    background: rgba(0, 255, 136, 0.15);
+    box-shadow: inset 0 0 100px rgba(0, 255, 136, 0.3);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* Applied when key is pressed */
+#attract-screen.key-pressed {
+  animation: attractKeyPressFlash 0.4s ease-out;
 }
