@@ -7,6 +7,7 @@ import {
 } from './VehicleModelTypes';
 import { CorvetteModel } from './CorvetteModel';
 import { CybertruckModel } from './CybertruckModel';
+import { MaterialLibrary } from '../../systems/MaterialLibrary';
 
 /**
  * VehicleModelFactory - Creates 3D vehicle models
@@ -152,11 +153,20 @@ export class VehicleModelFactory {
   }
 
   /**
-   * Create wheel material based on vehicle type.
+   * Create wheel material based on vehicle type using PBR Material Library.
    *
    * @private
    */
   private createWheelMaterial(modelType: VehicleModelType): THREE.Material {
+    const materialLib = MaterialLibrary.getInstance();
+
+    // Try to get tire material from library first
+    const tireMaterial = materialLib.getMaterial('tire');
+    if (tireMaterial) {
+      return tireMaterial;
+    }
+
+    // Fallback to basic material if library not initialized
     switch (modelType) {
       case VehicleModelType.CORVETTE:
         // Sport wheels - glossy black with some metallic shine

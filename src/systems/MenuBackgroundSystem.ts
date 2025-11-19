@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { VehicleModelFactory } from '../entities/models/VehicleModelFactory';
 import { VehicleModelType } from '../entities/models/VehicleModelTypes';
 import { PostProcessingSystem } from './PostProcessingSystem';
+import { MEDIUM_QUALITY } from '../config/GraphicsConfig';
 
 /**
  * MenuBackgroundSystem - 3D Background Scene for Main Menu
@@ -100,11 +101,12 @@ export class MenuBackgroundSystem {
     this.createSparkParticles();
     this.createDustParticles();
 
-    // Initialize post-processing (CRT effects)
+    // Initialize post-processing (CRT effects + new effects)
     this.postProcessing = new PostProcessingSystem(
       this.renderer,
       this.scene,
-      this.camera
+      this.camera,
+      MEDIUM_QUALITY // Default to medium quality for menu
     );
     // Disabled by default - will be enabled based on quality settings
     this.postProcessing.setEnabled(false);
@@ -358,15 +360,16 @@ export class MenuBackgroundSystem {
 
   /**
    * Set post-processing quality level
-   * Controls CRT effect intensity
+   * Now handled via GraphicsSettings in PostProcessingSystem
    *
    * @param quality - Quality level ('low', 'medium', 'high')
    */
   setPostProcessingQuality(quality: 'low' | 'medium' | 'high'): void {
     if (this.postProcessing) {
-      this.postProcessing.setQuality(quality);
+      // Note: Quality is now set via GraphicsSettings on initialization
+      // This method kept for legacy API compatibility
       this.postProcessing.setEnabled(true);
-      console.log(`[MenuBackgroundSystem] Post-processing set to ${quality.toUpperCase()}`);
+      console.log(`[MenuBackgroundSystem] Post-processing enabled (quality controlled via GraphicsSettings)`);
     }
   }
 

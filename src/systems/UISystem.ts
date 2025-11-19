@@ -39,6 +39,7 @@ import { CareerProgressionSystem } from './CareerProgressionSystem';
 export enum UIPanel {
   ATTRACT = 'attract',
   MAIN_MENU = 'main-menu',
+  TRACK_SELECTION = 'track-selection',
   CAR_SELECTION = 'car-selection',
   HUD = 'hud',
   PAUSE_MENU = 'pause-menu',
@@ -58,6 +59,7 @@ export class UISystem {
   private container: HTMLElement | null = null;
   private attractScreen: HTMLElement | null = null;
   private mainMenu: HTMLElement | null = null;
+  private trackSelection: HTMLElement | null = null;
   private carSelection: HTMLElement | null = null;
   private hud: HTMLElement | null = null;
   private pauseMenu: HTMLElement | null = null;
@@ -110,6 +112,7 @@ export class UISystem {
     this.createUIContainer();
     this.createAttractScreen();
     this.createMainMenu();
+    this.createTrackSelection();
     this.createCarSelection();
     this.createHUD();
     this.createPauseMenu();
@@ -187,6 +190,27 @@ export class UISystem {
     `;
 
     this.container?.appendChild(this.mainMenu);
+  }
+
+  /**
+   * Creates track selection screen
+   */
+  private createTrackSelection(): void {
+    this.trackSelection = document.createElement('div');
+    this.trackSelection.id = 'track-selection';
+    this.trackSelection.style.display = 'none';
+
+    this.trackSelection.innerHTML = `
+      <h1>SELECT TRACK</h1>
+      <div id="track-grid" class="track-grid">
+        <!-- Track cards will be populated dynamically -->
+      </div>
+      <div class="menu-footer">
+        Click a track to continue | ESC to go back
+      </div>
+    `;
+
+    this.container?.appendChild(this.trackSelection);
   }
 
   /**
@@ -328,7 +352,13 @@ export class UISystem {
     this.resultsScreen.style.display = 'none';
 
     this.resultsScreen.innerHTML = `
-      <h2>RACE COMPLETE!</h2>
+      <h2 id="results-title">RACE COMPLETE!</h2>
+      <div id="results-outcome-message" class="results-outcome-message"></div>
+      <div id="results-stars" class="results-stars">
+        <div class="star star-empty" data-star="1">☆</div>
+        <div class="star star-empty" data-star="2">☆</div>
+        <div class="star star-empty" data-star="3">☆</div>
+      </div>
       <div id="results-time">00:00.000</div>
       <div id="results-details">
         <div style="color: #888; margin-bottom: 1rem;">RACE STATISTICS</div>
@@ -474,6 +504,12 @@ export class UISystem {
             newElement = this.mainMenu;
           }
           break;
+        case UIPanel.TRACK_SELECTION:
+          if (this.trackSelection) {
+            this.trackSelection.style.display = 'flex';
+            newElement = this.trackSelection;
+          }
+          break;
         case UIPanel.CAR_SELECTION:
           if (this.carSelection) {
             this.carSelection.style.display = 'flex';
@@ -538,6 +574,8 @@ export class UISystem {
         return this.attractScreen;
       case UIPanel.MAIN_MENU:
         return this.mainMenu;
+      case UIPanel.TRACK_SELECTION:
+        return this.trackSelection;
       case UIPanel.CAR_SELECTION:
         return this.carSelection;
       case UIPanel.HUD:
@@ -561,10 +599,15 @@ export class UISystem {
   private hideAll(): void {
     if (this.attractScreen) this.attractScreen.style.display = 'none';
     if (this.mainMenu) this.mainMenu.style.display = 'none';
+    if (this.trackSelection) this.trackSelection.style.display = 'none';
     if (this.carSelection) this.carSelection.style.display = 'none';
     if (this.hud) this.hud.style.display = 'none';
     if (this.pauseMenu) this.pauseMenu.style.display = 'none';
-    if (this.resultsScreen) this.resultsScreen.style.display = 'none';
+    if (this.resultsScreen) {
+      this.resultsScreen.style.display = 'none';
+      // Clean up victory/defeat animation classes
+      this.resultsScreen.classList.remove('results-victory', 'results-defeat');
+    }
     if (this.settingsScreen) this.settingsScreen.style.display = 'none';
     if (this.leaderboardScreen) this.leaderboardScreen.style.display = 'none';
   }
@@ -608,12 +651,55 @@ export class UISystem {
 
   /**
    * Shows results screen with lap time and comprehensive race statistics
+   * Now includes victory/defeat animations based on star rating
    */
   public showResults(lapTime: string, stats: any): void {
     console.log('[UI RESULTS] showResults called with:', { lapTime, stats });
     console.log('[UI RESULTS] resultsScreen element:', this.resultsScreen);
 
     this.showPanel(UIPanel.RESULTS);
+
+    // Determine victory or defeat based on stars
+    const stars = stats.stars !== undefined ? stats.stars : 0;
+    const isVictory = stars > 0;
+    const isDefeat = !isVictory;
+
+    console.log('[UI RESULTS] Stars:', stars, 'Victory:', isVictory, 'Defeat:', isDefeat);
+
+    // Apply victory/defeat class to results screen
+    if (this.resultsScreen) {
+      // Remove previous state classes
+      this.resultsScreen.classList.remove('results-victory', 'results-defeat');
+
+      // Apply new state class
+      if (isVictory) {
+        this.resultsScreen.classList.add('results-victory');
+      } else {
+        this.resultsScreen.classList.add('results-defeat');
+      }
+    }
+
+    // Update title based on outcome
+    const titleElement = this.resultsScreen?.querySelector('#results-title');
+    if (titleElement) {
+      titleElement.textContent = isVictory ? 'RACE COMPLETE!' : 'RACE COMPLETE';
+    }
+
+    // Update outcome message
+    const outcomeMessage = this.resultsScreen?.querySelector('#results-outcome-message');
+    if (outcomeMessage) {
+      if (isVictory) {
+        const messages = ['EXCELLENT!', 'GREAT RUN!', 'NICE TIME!'];
+        const message = stars === 3 ? messages[0] : stars === 2 ? messages[1] : messages[2];
+        outcomeMessage.textContent = message;
+      } else {
+        const messages = ['TRY AGAIN', 'KEEP PUSHING!'];
+        outcomeMessage.textContent = messages[Math.floor(Math.random() * messages.length)];
+      }
+    }
+
+    // Animate stars reveal
+    this.animateStars(stars);
 
     const timeDisplay = this.resultsScreen?.querySelector('#results-time');
     console.log('[UI RESULTS] timeDisplay element:', timeDisplay);
@@ -677,10 +763,42 @@ export class UISystem {
         lapsCompleted: stats.lapsCompleted,
         crashes: stats.crashes,
         topSpeed: stats.topSpeed,
-        averageSpeed: stats.averageSpeed
+        averageSpeed: stats.averageSpeed,
+        stars
       });
     } else {
       console.error('[UI RESULTS] Stats display element not found!');
+    }
+  }
+
+  /**
+   * Animates star reveal sequence
+   * Stars fill in sequentially with scale and glow effects
+   */
+  private animateStars(starsEarned: number): void {
+    const starElements = this.resultsScreen?.querySelectorAll('.star');
+    if (!starElements) return;
+
+    // Reset all stars to empty
+    starElements.forEach((star) => {
+      star.classList.remove('star-filled', 'star-gold');
+      star.classList.add('star-empty');
+      star.textContent = '☆';
+    });
+
+    // Animate each earned star
+    for (let i = 0; i < starsEarned; i++) {
+      setTimeout(() => {
+        const star = starElements[i];
+        star.classList.remove('star-empty');
+        star.classList.add('star-filled');
+        star.textContent = '★';
+
+        // Add gold glow for 3-star rating
+        if (starsEarned === 3) {
+          star.classList.add('star-gold');
+        }
+      }, 500 + i * 200); // 0.5s delay, then 0.2s between each star
     }
   }
 
@@ -823,6 +941,85 @@ export class UISystem {
   }
 
   /**
+   * Populates track selection screen with available tracks
+   * Shows locked/unlocked states, difficulty, best times, and star ratings
+   */
+  public populateTrackSelection(onTrackSelected: (trackId: string) => void): void {
+    const trackGrid = document.getElementById('track-grid');
+    if (!trackGrid) return;
+
+    const career = CareerProgressionSystem.getInstance();
+    const allTracks = career.getAllTracks();
+
+    // Clear existing content
+    trackGrid.innerHTML = '';
+
+    allTracks.forEach(track => {
+      const isLocked = !track.unlocked;
+      const completion = career.getTrackCompletion(track.id);
+
+      // Format best time
+      let bestTimeStr = '--:--.---';
+      if (completion && completion.bestTime > 0) {
+        const minutes = Math.floor(completion.bestTime / 60000);
+        const seconds = Math.floor((completion.bestTime % 60000) / 1000);
+        const ms = completion.bestTime % 1000;
+        bestTimeStr = `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+      }
+
+      // Calculate star rating (placeholder logic - can be enhanced)
+      let stars = 0;
+      if (completion && completion.completionCount > 0) {
+        stars = Math.min(3, Math.floor(completion.completionCount / 2) + 1);
+      }
+
+      // Create star display
+      const starDisplay = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+
+      // Get difficulty label
+      const difficultyLabels = ['', 'EASY', 'MEDIUM', 'HARD', 'VERY HARD', 'EXTREME'];
+      const difficultyLabel = difficultyLabels[track.difficulty] || 'MEDIUM';
+      const difficultyClass = `difficulty-${track.difficulty}`;
+
+      // Create track card
+      const card = document.createElement('div');
+      card.className = `track-card ${isLocked ? 'track-card--locked' : ''}`;
+      card.setAttribute('data-track-id', track.id);
+
+      card.innerHTML = `
+        <div class="track-card-header">
+          <h3 class="track-name">${track.name}</h3>
+          ${isLocked ? '<div class="track-lock-icon">🔒</div>' : ''}
+        </div>
+        <div class="track-difficulty ${difficultyClass}">
+          <span class="difficulty-label">${difficultyLabel}</span>
+        </div>
+        <div class="track-description">${track.description}</div>
+        <div class="track-stats">
+          <div class="track-stat-row">
+            <span class="track-stat-label">Best Time:</span>
+            <span class="track-stat-value">${bestTimeStr}</span>
+          </div>
+          <div class="track-stat-row">
+            <span class="track-stat-label">Rating:</span>
+            <span class="track-stars">${starDisplay}</span>
+          </div>
+        </div>
+        ${!isLocked ? '<div class="track-play-hint">Click to Race</div>' : '<div class="track-locked-hint">Complete previous track to unlock</div>'}
+      `;
+
+      // Add click handler for unlocked tracks
+      if (!isLocked) {
+        card.addEventListener('click', () => {
+          onTrackSelected(track.id);
+        });
+      }
+
+      trackGrid.appendChild(card);
+    });
+  }
+
+  /**
    * Disposes UI system and removes DOM elements
    */
   public dispose(): void {
@@ -833,6 +1030,7 @@ export class UISystem {
 
     this.attractScreen = null;
     this.mainMenu = null;
+    this.trackSelection = null;
     this.carSelection = null;
     this.hud = null;
     this.pauseMenu = null;

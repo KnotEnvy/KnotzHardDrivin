@@ -3,6 +3,9 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { PhysicsWorld } from '../core/PhysicsWorld';
 import { SurfaceType } from '../types/VehicleTypes';
 import { Obstacle, ObstacleType } from './Obstacle';
+import { TrackScenerySystem, SceneryData } from '../systems/TrackScenerySystem';
+import { BackgroundSystem, BackgroundType } from '../systems/BackgroundSystem';
+import { MaterialLibrary } from '../systems/MaterialLibrary';
 
 /**
  * Track section type definitions.
@@ -63,6 +66,10 @@ export interface TrackData {
   waypoints?: WaypointData[]; // Optional - auto-generated from section boundaries if not provided
   spawnPoint: SpawnPointData;
   obstacles?: ObstacleData[];
+  scenery?: SceneryData[]; // Optional - environmental scenery (grandstands, barriers, props)
+  skybox?: string; // Optional - skybox type ('day', 'sunset', 'night', 'desert', 'city')
+  timeOfDay?: string; // Optional - time of day ('day', 'sunset', 'night', 'dawn')
+  background?: string; // Optional - distant background type ('desert', 'city', 'mountain', 'forest', 'none')
 }
 
 /**
@@ -83,6 +90,8 @@ export class Track {
   private physicsWorld: PhysicsWorld; // Store reference for cleanup
   private scene: THREE.Scene; // Store reference for obstacle cleanup
   private obstacles: Obstacle[] = []; // Track obstacles
+  private scenerySystem: TrackScenerySystem | null = null; // Track scenery system
+  private backgroundSystem: BackgroundSystem | null = null; // Distant background system
 
   // Temp objects to avoid per-frame allocations
   private tempVec1 = new THREE.Vector3();
@@ -95,8 +104,9 @@ export class Track {
    * @param data - Track configuration data (from JSON)
    * @param world - Physics world for collision mesh
    * @param scene - Three.js scene to add visual mesh to
+   * @param camera - Camera for scenery LOD (optional)
    */
-  constructor(data: TrackData, world: PhysicsWorld, scene: THREE.Scene) {
+  constructor(data: TrackData, world: PhysicsWorld, scene: THREE.Scene, camera?: THREE.Camera) {
     // Generate track geometry
     this.generateSpline(data.sections);
     this.mesh = this.generateMesh(data.width);
@@ -120,25 +130,133 @@ export class Track {
     // Create obstacles
     this.createObstacles(data.obstacles, world, scene);
 
+    // Create scenery if data provided
+    if (data.scenery && data.scenery.length > 0 && camera) {
+      this.scenerySystem = new TrackScenerySystem(scene, camera, world);
+      this.scenerySystem.init(data.scenery);
+      console.log(`Track scenery loaded: ${this.scenerySystem.getTriangleCount()} triangles`);
+    }
+
+    // Create background system if camera provided
+    if (camera) {
+      this.backgroundSystem = new BackgroundSystem(scene, camera);
+      this.initializeBackground(data.background || 'none');
+    }
+
     console.log(`Track "${this.trackData.name}" loaded: ${this.trackData.sections.length} sections, ${this.trackData.waypoints?.length || 0} waypoints, ${this.obstacles.length} obstacles`);
+  }
+
+  /**
+   * Initialize background system based on track data
+   *
+   * @param backgroundType - Background type from track JSON
+   */
+  private async initializeBackground(backgroundType: string): Promise<void> {
+    if (!this.backgroundSystem) return;
+
+    // Map background string to BackgroundType
+    const bgType = this.parseBackgroundType(backgroundType);
+
+    // Configure based on track theme
+    const config = this.getBackgroundConfig(bgType);
+
+    await this.backgroundSystem.setBackground(bgType, config);
+  }
+
+  /**
+   * Parse background type string from track JSON
+   */
+  private parseBackgroundType(type: string): BackgroundType {
+    switch (type.toLowerCase()) {
+      case 'desert':
+        return 'desert';
+      case 'city':
+        return 'city';
+      case 'mountain':
+        return 'mountain';
+      case 'forest':
+        return 'forest';
+      default:
+        return 'none';
+    }
+  }
+
+  /**
+   * Get background configuration based on type
+   */
+  private getBackgroundConfig(type: BackgroundType): Partial<{
+    distance: number;
+    parallaxFactor: number;
+    enableClouds: boolean;
+    enableAtmosphericEffects: boolean;
+  }> {
+    switch (type) {
+      case 'desert':
+        return {
+          distance: 1200,
+          parallaxFactor: 0.25,
+          enableClouds: false,
+          enableAtmosphericEffects: true,
+        };
+      case 'city':
+        return {
+          distance: 800,
+          parallaxFactor: 0.35,
+          enableClouds: false,
+          enableAtmosphericEffects: false,
+        };
+      case 'mountain':
+        return {
+          distance: 1500,
+          parallaxFactor: 0.2,
+          enableClouds: true,
+          enableAtmosphericEffects: false,
+        };
+      case 'forest':
+        return {
+          distance: 1000,
+          parallaxFactor: 0.3,
+          enableClouds: true,
+          enableAtmosphericEffects: false,
+        };
+      default:
+        return {};
+    }
+  }
+
+  /**
+   * Update background system (parallax and clouds)
+   *
+   * Call this from game loop for animated backgrounds.
+   * Performance: <0.3ms per frame
+   *
+   * @param deltaTime - Time since last frame in seconds
+   */
+  updateBackground(deltaTime: number): void {
+    if (this.backgroundSystem) {
+      this.backgroundSystem.update(deltaTime);
+    }
   }
 
   /**
    * Generates a Catmull-Rom spline from track sections.
    *
    * Processes each section sequentially, generating control points
-   * that define the track's centerline path.
+   * that define the track's centerline path. Also tracks banking angles
+   * per control point for proper mesh generation.
    *
    * @param sections - Array of track section definitions
    */
   private generateSpline(sections: TrackSection[]): void {
     const points: THREE.Vector3[] = [];
+    const bankingAngles: number[] = [];
+
     // FIX: Elevate track 0.5m above ground to prevent clipping (ground is at Y=0)
     let currentPos = new THREE.Vector3(0, 0.5, 0);
     let currentDir = new THREE.Vector3(0, 0, 1); // Start facing +Z
 
     for (const section of sections) {
-      const sectionPoints = this.generateSectionPoints(
+      const result = this.generateSectionPoints(
         section,
         currentPos,
         currentDir
@@ -146,33 +264,36 @@ export class Track {
 
       // Add all but the first point (to avoid duplicates)
       if (points.length === 0) {
-        points.push(...sectionPoints);
+        points.push(...result.points);
+        bankingAngles.push(...result.bankingAngles);
       } else {
-        points.push(...sectionPoints.slice(1));
+        points.push(...result.points.slice(1));
+        bankingAngles.push(...result.bankingAngles.slice(1));
       }
 
       // Update position and direction for next section
-      if (sectionPoints.length > 1) {
-        currentPos = sectionPoints[sectionPoints.length - 1].clone();
-        currentDir = sectionPoints[sectionPoints.length - 1]
+      if (result.points.length > 1) {
+        currentPos = result.points[result.points.length - 1].clone();
+        currentDir = result.points[result.points.length - 1]
           .clone()
-          .sub(sectionPoints[sectionPoints.length - 2])
+          .sub(result.points[result.points.length - 2])
           .normalize();
-      } else if (sectionPoints.length === 1) {
+      } else if (result.points.length === 1) {
         // Single point section - use that point but don't update direction
-        currentPos = sectionPoints[0].clone();
+        currentPos = result.points[0].clone();
         console.warn(`Track section generated only 1 point - direction not updated`);
       } else {
         throw new Error(`Track section generated 0 points - invalid track configuration`);
       }
     }
 
-    // Store control points for later reference
+    // Store control points and banking data for later reference
     this.controlPoints = points;
+    this.controlPointBanking = bankingAngles;
 
     // Create closed loop spline
     this.spline = new THREE.CatmullRomCurve3(points, true);
-    console.log(`Spline generated with ${points.length} control points`);
+    console.log(`Spline generated with ${points.length} control points, ${bankingAngles.length} banking angles`);
   }
 
   /**
@@ -181,14 +302,15 @@ export class Track {
    * @param section - Section configuration
    * @param startPos - Starting position in world space
    * @param startDir - Starting direction (unit vector)
-   * @returns Array of Vector3 points defining the section
+   * @returns Object containing points and banking angles for the section
    */
   private generateSectionPoints(
     section: TrackSection,
     startPos: THREE.Vector3,
     startDir: THREE.Vector3
-  ): THREE.Vector3[] {
+  ): { points: THREE.Vector3[]; bankingAngles: number[] } {
     const points: THREE.Vector3[] = [];
+    const bankingAngles: number[] = [];
 
     // Use appropriate divisions based on section type
     // Straights need minimal points, curves need more for smoothness
@@ -198,12 +320,14 @@ export class Track {
         divisions = 1; // Only start and end points for straight lines
         break;
       case 'curve':
-      case 'loop':
       case 'bank':
         divisions = 20; // Smooth curves need more points
         break;
+      case 'loop':
+        divisions = 30; // Loops need even more for smoothness
+        break;
       case 'ramp':
-        divisions = 5; // Ramps need a few points for elevation changes
+        divisions = 8; // Ramps need enough points for smooth elevation
         break;
       default:
         divisions = 10;
@@ -218,6 +342,7 @@ export class Track {
             startDir.clone().multiplyScalar(length * t)
           );
           points.push(pos);
+          bankingAngles.push(0); // No banking on straights
         }
         break;
       }
@@ -225,28 +350,34 @@ export class Track {
       case 'curve': {
         const radius = section.radius || 30;
         const angle = ((section.angle || 90) * Math.PI) / 180; // Convert to radians
+        const isLeftTurn = angle > 0;
 
         // Calculate curve center perpendicular to start direction
-        const right = this.tempVec1.crossVectors(
-          startDir,
-          new THREE.Vector3(0, 1, 0)
-        ).normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
 
-        const center = startPos.clone().add(right.multiplyScalar(radius));
+        // For positive angle, turn right (center is to the right)
+        // For negative angle, turn left (center is to the left)
+        const turnDirection = isLeftTurn ? -1 : 1;
+        const center = startPos.clone().add(right.multiplyScalar(radius * turnDirection));
+
+        // Calculate initial angle offset from center
+        const initialOffset = new THREE.Vector3().subVectors(startPos, center);
+        const initialAngle = Math.atan2(initialOffset.z, initialOffset.x);
 
         for (let i = 0; i <= divisions; i++) {
           const t = i / divisions;
-          const theta = angle * t;
+          const theta = initialAngle + angle * t;
 
-          // Rotate around center
-          const offset = this.tempVec2.set(
-            -Math.sin(theta) * radius,
-            0,
-            Math.cos(theta) * radius
+          // Calculate position on arc
+          const pos = new THREE.Vector3(
+            center.x + Math.cos(theta) * radius,
+            startPos.y, // Maintain elevation (for now - will be overridden by ramps)
+            center.z + Math.sin(theta) * radius
           );
 
-          const pos = center.clone().add(offset);
           points.push(pos);
+          bankingAngles.push(0); // Regular curves have no banking (use 'bank' type for that)
         }
         break;
       }
@@ -257,10 +388,17 @@ export class Track {
 
         for (let i = 0; i <= divisions; i++) {
           const t = i / divisions;
+          // Smooth ease-in/ease-out curve for height transition
+          const heightCurve = t < 0.5
+            ? 2 * t * t // Ease in
+            : 1 - Math.pow(-2 * t + 2, 2) / 2; // Ease out
+
           const pos = startPos.clone()
             .add(startDir.clone().multiplyScalar(length * t))
-            .setY(startPos.y + height * t);
+            .setY(startPos.y + height * heightCurve);
+
           points.push(pos);
+          bankingAngles.push(0); // No banking on ramps
         }
         break;
       }
@@ -269,45 +407,74 @@ export class Track {
         const loopRadius = section.radius || 15;
 
         // Full 360-degree vertical loop
+        // The loop is oriented perpendicular to the start direction
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
+
         for (let i = 0; i <= divisions; i++) {
           const t = i / divisions;
-          const theta = Math.PI * 2 * t;
+          const theta = Math.PI * 2 * t; // Full 360 degrees
 
-          const pos = new THREE.Vector3(
-            startPos.x,
-            startPos.y + loopRadius * (1 - Math.cos(theta)),
-            startPos.z + loopRadius * Math.sin(theta)
-          );
+          // Calculate position on vertical loop
+          // Start at bottom, go around
+          const verticalOffset = loopRadius * (1 - Math.cos(theta));
+          const forwardOffset = loopRadius * Math.sin(theta);
+
+          const pos = startPos.clone()
+            .add(up.clone().multiplyScalar(verticalOffset))
+            .add(startDir.clone().multiplyScalar(forwardOffset));
+
           points.push(pos);
+          bankingAngles.push(0); // Loops handle their own geometry
         }
         break;
       }
 
       case 'bank': {
-        // Banked curve - similar to curve but with banking angle
+        // Banked curve - curve with progressive banking
         const radius = section.radius || 40;
         const angle = ((section.angle || 90) * Math.PI) / 180;
-        const banking = ((section.banking || 15) * Math.PI) / 180;
+        const maxBanking = ((section.banking || 15) * Math.PI) / 180;
+        const isLeftTurn = angle > 0;
 
-        const right = this.tempVec1.crossVectors(
-          startDir,
-          new THREE.Vector3(0, 1, 0)
-        ).normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
 
-        const center = startPos.clone().add(right.multiplyScalar(radius));
+        const turnDirection = isLeftTurn ? -1 : 1;
+        const center = startPos.clone().add(right.multiplyScalar(radius * turnDirection));
+
+        // Calculate initial angle offset
+        const initialOffset = new THREE.Vector3().subVectors(startPos, center);
+        const initialAngle = Math.atan2(initialOffset.z, initialOffset.x);
 
         for (let i = 0; i <= divisions; i++) {
           const t = i / divisions;
-          const theta = angle * t;
+          const theta = initialAngle + angle * t;
 
-          const offset = this.tempVec2.set(
-            -Math.sin(theta) * radius,
-            Math.sin(banking) * radius * t, // Apply banking
-            Math.cos(theta) * radius
+          // Progressive banking: ease in, full bank in middle, ease out
+          let bankingProgress: number;
+          if (t < 0.25) {
+            // Ease in over first 25%
+            bankingProgress = (t / 0.25);
+          } else if (t > 0.75) {
+            // Ease out over last 25%
+            bankingProgress = ((1 - t) / 0.25);
+          } else {
+            // Full banking in middle 50%
+            bankingProgress = 1.0;
+          }
+
+          const currentBanking = maxBanking * bankingProgress * turnDirection;
+
+          // Calculate position on arc (no elevation change from banking itself)
+          const pos = new THREE.Vector3(
+            center.x + Math.cos(theta) * radius,
+            startPos.y,
+            center.z + Math.sin(theta) * radius
           );
 
-          const pos = center.clone().add(offset);
           points.push(pos);
+          bankingAngles.push(currentBanking);
         }
         break;
       }
@@ -315,9 +482,10 @@ export class Track {
       default:
         console.warn(`Unknown section type: ${section.type}`);
         points.push(startPos.clone());
+        bankingAngles.push(0);
     }
 
-    return points;
+    return { points, bankingAngles };
   }
 
   /**
@@ -325,12 +493,18 @@ export class Track {
    *
    * Creates a ribbon mesh following the spline with proper width.
    * Calculates UVs for texture mapping with smooth, continuous texturing.
+   * Supports banking angles and elevation changes for realistic track geometry.
    *
    * UV Mapping Strategy:
    * - U coordinate (0-1): Maps across track width from left to right
    * - V coordinate: Accumulates distance along track centerline for continuous tiling
    * - Texture repeats approximately every 2 units of track distance
    * - No visible banding or seams at tessellation boundaries
+   *
+   * Banking Support:
+   * - Rotates track surface around tangent vector (track direction)
+   * - Banking metadata stored per control point for smooth interpolation
+   * - Preserves proper normal vectors for lighting and collision
    *
    * Closed Loop Handling:
    * - For closed loops, properly connects last segment back to first
@@ -383,17 +557,50 @@ export class Track {
       const t = i / numSegments;
 
       // Get tangent (direction along track)
-      const tangent = this.spline.getTangent(t);
+      const tangent = this.spline.getTangent(t).normalize();
 
-      // Calculate binormal (perpendicular to tangent in horizontal plane)
-      const up = this.tempVec1.set(0, 1, 0);
-      const binormal = this.tempVec2.crossVectors(tangent, up).normalize();
+      // Calculate banking angle at this point (interpolate from control point metadata)
+      const bankingAngle = this.getBankingAtParameter(t);
 
-      // Create left and right edges
-      const leftEdge = this.tempVec3.copy(point).add(
+      // Create proper coordinate frame for the track cross-section
+      // 1. Start with world up vector
+      const worldUp = this.tempVec1.set(0, 1, 0);
+
+      // 2. Calculate binormal (perpendicular to tangent, initially in horizontal plane)
+      let binormal = this.tempVec2.crossVectors(worldUp, tangent).normalize();
+
+      // Handle case where tangent is parallel to world up (vertical sections)
+      if (binormal.lengthSq() < 0.001) {
+        // Use a fallback binormal for vertical sections
+        binormal.set(1, 0, 0);
+      }
+
+      // 3. Calculate proper normal (perpendicular to both tangent and binormal)
+      const normal = this.tempVec3.crossVectors(tangent, binormal).normalize();
+
+      // 4. Apply banking rotation around the tangent vector
+      if (Math.abs(bankingAngle) > 0.001) {
+        // Rotate binormal and normal around tangent by banking angle
+        const cosBank = Math.cos(bankingAngle);
+        const sinBank = Math.sin(bankingAngle);
+
+        const binormalBanked = new THREE.Vector3()
+          .copy(binormal).multiplyScalar(cosBank)
+          .add(normal.clone().multiplyScalar(sinBank));
+
+        const normalBanked = new THREE.Vector3()
+          .copy(normal).multiplyScalar(cosBank)
+          .sub(binormal.clone().multiplyScalar(sinBank));
+
+        binormal.copy(binormalBanked).normalize();
+        normal.copy(normalBanked).normalize();
+      }
+
+      // Create left and right edges using banked binormal
+      const leftEdge = new THREE.Vector3().copy(point).add(
         binormal.clone().multiplyScalar(-width / 2)
       );
-      const rightEdge = point.clone().add(
+      const rightEdge = new THREE.Vector3().copy(point).add(
         binormal.clone().multiplyScalar(width / 2)
       );
 
@@ -411,9 +618,9 @@ export class Track {
       uvs.push(0, vCoord); // Left edge
       uvs.push(1, vCoord); // Right edge
 
-      // Add normals (pointing up)
-      normals.push(0, 1, 0);
-      normals.push(0, 1, 0);
+      // Add normals (use calculated normal for proper lighting on banked sections)
+      normals.push(normal.x, normal.y, normal.z);
+      normals.push(normal.x, normal.y, normal.z);
     }
 
     // Generate indices to create triangle pairs
@@ -446,15 +653,21 @@ export class Track {
     // Compute vertex normals for smooth shading
     geometry.computeVertexNormals();
 
-    // Create material with better shading to reduce visible seams
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x2a2a2a, // Slightly lighter for better detail visibility
-      roughness: 0.9, // Higher roughness reduces specular highlights that show seams
-      metalness: 0.05, // Less metalness for more diffuse lighting
-      side: THREE.FrontSide, // Single-sided to prevent z-fighting
-      flatShading: false, // Ensure smooth shading
-      wireframe: false, // Ensure filled geometry
-    });
+    // Create material using PBR Material Library
+    const materialLib = MaterialLibrary.getInstance();
+    let material = materialLib.getMaterial('asphalt');
+
+    // Fallback to basic material if library not initialized
+    if (!material) {
+      material = new THREE.MeshStandardMaterial({
+        color: 0x2a2a2a, // Dark asphalt
+        roughness: 0.85, // Rough asphalt surface
+        metalness: 0.0, // Non-metallic
+        side: THREE.FrontSide,
+        flatShading: false,
+        wireframe: false,
+      });
+    }
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
@@ -466,6 +679,41 @@ export class Track {
     );
 
     return mesh;
+  }
+
+  /**
+   * Metadata for tracking banking angles per control point.
+   * Index corresponds to control point index.
+   */
+  private controlPointBanking: number[] = [];
+
+  /**
+   * Gets banking angle at a given spline parameter (0-1).
+   * Interpolates between control points for smooth banking transitions.
+   *
+   * @param t - Spline parameter (0-1)
+   * @returns Banking angle in radians
+   */
+  private getBankingAtParameter(t: number): number {
+    if (this.controlPointBanking.length === 0) {
+      return 0; // No banking data
+    }
+
+    // Map spline parameter to control point indices
+    const floatIndex = t * (this.controlPointBanking.length - 1);
+    const index1 = Math.floor(floatIndex);
+    const index2 = Math.ceil(floatIndex);
+    const fraction = floatIndex - index1;
+
+    // Clamp indices to valid range
+    const clampedIndex1 = Math.max(0, Math.min(this.controlPointBanking.length - 1, index1));
+    const clampedIndex2 = Math.max(0, Math.min(this.controlPointBanking.length - 1, index2));
+
+    // Linear interpolation between banking angles
+    const banking1 = this.controlPointBanking[clampedIndex1] || 0;
+    const banking2 = this.controlPointBanking[clampedIndex2] || 0;
+
+    return banking1 + (banking2 - banking1) * fraction;
   }
 
   /**
@@ -799,6 +1047,18 @@ export class Track {
       obstacle.dispose(this.physicsWorld, this.scene);
     }
     this.obstacles = [];
+
+    // Dispose scenery system
+    if (this.scenerySystem) {
+      this.scenerySystem.dispose();
+      this.scenerySystem = null;
+    }
+
+    // Dispose background system
+    if (this.backgroundSystem) {
+      this.backgroundSystem.dispose();
+      this.backgroundSystem = null;
+    }
 
     // Remove collider and rigid body from physics world
     if (this.collider && this.physicsWorld.world) {

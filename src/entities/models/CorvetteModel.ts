@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { IVehicleModelBuilder, VehicleModelConfig } from './VehicleModelTypes';
+import { MaterialLibrary } from '../../systems/MaterialLibrary';
 
 /**
  * Corvette-Style Sports Car Model
@@ -25,25 +26,37 @@ export class CorvetteModel implements IVehicleModelBuilder {
   }
 
   /**
-   * Build the complete Corvette model.
+   * Build the complete Corvette model using PBR materials.
    */
   buildModel(): THREE.Group {
     const carGroup = new THREE.Group();
     carGroup.name = 'corvette-body';
 
-    // Create materials
-    const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: this.config.bodyColor,
-      metalness: this.config.metalness,
-      roughness: this.config.roughness,
+    const materialLib = MaterialLibrary.getInstance();
+
+    // Try to get PBR car paint material from library
+    let bodyMaterial: THREE.Material;
+    const pbrPaint = this.getPaintMaterialFromConfig();
+    if (pbrPaint) {
+      bodyMaterial = pbrPaint;
+    } else {
+      // Fallback: Create enhanced PBR material
+      bodyMaterial = new THREE.MeshStandardMaterial({
+        color: this.config.bodyColor,
+        metalness: 0.9,  // Very metallic for car paint
+        roughness: 0.15, // Glossy finish
+        envMapIntensity: 1.2, // Strong reflections
+      });
+    }
+
+    // Chrome/metal accents
+    const accentMaterial = materialLib.getMaterial('chrome') || new THREE.MeshStandardMaterial({
+      color: 0xcccccc,
+      metalness: 1.0,
+      roughness: 0.05,
     });
 
-    const accentMaterial = new THREE.MeshStandardMaterial({
-      color: this.config.accentColor || 0x000000,
-      metalness: 0.6,
-      roughness: 0.4,
-    });
-
+    // Glass windows with PBR properties
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: 0x88ccff,
       metalness: 0.0,
@@ -51,6 +64,7 @@ export class CorvetteModel implements IVehicleModelBuilder {
       transmission: 0.9, // Glass-like transparency
       transparent: true,
       opacity: 0.3,
+      envMapIntensity: 1.0,
     });
 
     // Build car parts
@@ -234,19 +248,25 @@ export class CorvetteModel implements IVehicleModelBuilder {
   }
 
   /**
-   * Headlights and taillights
+   * Headlights and taillights using PBR materials
    */
   private buildLights(parent: THREE.Group): void {
-    const headlightMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffaa,
-      emissive: 0xffffaa,
+    const materialLib = MaterialLibrary.getInstance();
+
+    const headlightMaterial = materialLib.getMaterial('headlight') || new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffcc,
       emissiveIntensity: 0.5,
+      metalness: 0.0,
+      roughness: 0.1,
     });
 
-    const taillightMaterial = new THREE.MeshStandardMaterial({
+    const taillightMaterial = materialLib.getMaterial('taillight') || new THREE.MeshStandardMaterial({
       color: 0xff0000,
       emissive: 0xff0000,
-      emissiveIntensity: 0.5,
+      emissiveIntensity: 0.3,
+      metalness: 0.0,
+      roughness: 0.1,
     });
 
     // Headlights (front)
@@ -270,6 +290,33 @@ export class CorvetteModel implements IVehicleModelBuilder {
     const rightTaillight = new THREE.Mesh(taillightGeo, taillightMaterial);
     rightTaillight.position.set(0.7, 0.35, -2.62);
     parent.add(rightTaillight);
+  }
+
+  /**
+   * Get PBR paint material based on config color
+   */
+  private getPaintMaterialFromConfig(): THREE.Material | null {
+    const materialLib = MaterialLibrary.getInstance();
+    const color = this.config.bodyColor;
+
+    // Match config color to predefined paint materials
+    if (color === 0xcc0000 || color === 0xff0000) {
+      return materialLib.getMaterial('car_paint_red');
+    } else if (color === 0x0044cc || color === 0x0000ff) {
+      return materialLib.getMaterial('car_paint_blue');
+    } else if (color === 0xffcc00 || color === 0xffff00) {
+      return materialLib.getMaterial('car_paint_yellow');
+    } else if (color === 0x0a0a0a || color === 0x000000) {
+      return materialLib.getMaterial('car_paint_black');
+    }
+
+    // Create custom color variant if no exact match
+    const baseMaterial = materialLib.getMaterial('car_paint_red');
+    if (baseMaterial) {
+      return materialLib.createColorVariant('car_paint_red', color, `car_paint_custom_${color.toString(16)}`);
+    }
+
+    return null;
   }
 
   /**

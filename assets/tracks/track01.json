@@ -1,24 +1,49 @@
 {
-  "name": "Thunder Speedway Oval",
+  "name": "Thunder Speedway Oval - Banked Edition",
   "width": 10,
+  "skybox": "day",
+  "timeOfDay": "day",
+  "background": "desert",
   "sections": [
     {
       "type": "straight",
-      "length": 120
+      "length": 80
     },
     {
-      "type": "curve",
+      "type": "ramp",
+      "length": 40,
+      "height": 3
+    },
+    {
+      "type": "bank",
       "radius": 50,
-      "angle": 90
+      "angle": 90,
+      "banking": 25
+    },
+    {
+      "type": "ramp",
+      "length": 30,
+      "height": -3
     },
     {
       "type": "straight",
-      "length": 120
+      "length": 80
     },
     {
-      "type": "curve",
+      "type": "ramp",
+      "length": 40,
+      "height": 3
+    },
+    {
+      "type": "bank",
       "radius": 50,
-      "angle": 90
+      "angle": 90,
+      "banking": 25
+    },
+    {
+      "type": "ramp",
+      "length": 30,
+      "height": -3
     }
   ],
   "spawnPoint": {
@@ -56,27 +81,27 @@
     },
     {
       "type": "cone",
-      "position": [5, 0.3, 150]
+      "position": [5, 3.3, 150]
     },
     {
       "type": "cone",
-      "position": [-5, 0.3, 150]
+      "position": [-5, 3.3, 150]
     },
     {
       "type": "barrier",
-      "position": [70, 0.3, 170]
+      "position": [70, 3.3, 170]
     },
     {
       "type": "tire_wall",
-      "position": [130, 0.5, 170]
+      "position": [130, 3.5, 170]
     },
     {
       "type": "cone",
-      "position": [150, 0.3, 140]
+      "position": [150, 3.3, 140]
     },
     {
       "type": "cone",
-      "position": [150, 0.3, 100]
+      "position": [150, 3.3, 100]
     },
     {
       "type": "barrier",
@@ -105,6 +130,80 @@
     {
       "type": "barrier",
       "position": [40, 0.3, -10]
+    }
+  ],
+  "scenery": [
+    {
+      "type": "grandstand",
+      "position": [-30, 5, 0],
+      "rotation": 90,
+      "scale": 1.0
+    },
+    {
+      "type": "grandstand",
+      "position": [180, 5, 80],
+      "rotation": -90,
+      "scale": 1.2
+    },
+    {
+      "type": "concrete_barrier",
+      "start": [-8, 0.5, 0],
+      "end": [-8, 0.5, 80]
+    },
+    {
+      "type": "concrete_barrier",
+      "start": [18, 0.5, 0],
+      "end": [18, 0.5, 80]
+    },
+    {
+      "type": "safety_fence",
+      "start": [-10, 0.5, 80],
+      "end": [20, 0.5, 180]
+    },
+    {
+      "type": "safety_fence",
+      "start": [160, 0.5, 180],
+      "end": [160, 0.5, 80]
+    },
+    {
+      "type": "tree",
+      "position": [-50, 0, 40],
+      "instanceCount": 15,
+      "spread": 60
+    },
+    {
+      "type": "tree",
+      "position": [200, 0, 120],
+      "instanceCount": 20,
+      "spread": 80
+    },
+    {
+      "type": "rock",
+      "position": [-40, 0, 100],
+      "instanceCount": 8,
+      "spread": 30
+    },
+    {
+      "type": "flag",
+      "position": [0, 0.5, -5],
+      "scale": 1.5
+    },
+    {
+      "type": "flag",
+      "position": [5, 0.5, -5],
+      "scale": 1.5
+    },
+    {
+      "type": "building",
+      "position": [-60, 6, -20],
+      "rotation": 45,
+      "scale": 1.0
+    },
+    {
+      "type": "building",
+      "position": [210, 6, 100],
+      "rotation": -30,
+      "scale": 0.8
     }
   ]
 }

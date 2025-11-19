@@ -26,6 +26,7 @@ export interface GraphicsSettings {
   // Shadow settings
   shadowMapSize: number;          // Shadow map resolution (512, 1024, 2048, 4096)
   shadowsEnabled: boolean;        // Toggle shadows completely
+  shadowType: 'basic' | 'soft' | 'pcf';  // Shadow map type
 
   // Anti-aliasing
   antialiasing: boolean;          // MSAA anti-aliasing
@@ -38,13 +39,26 @@ export interface GraphicsSettings {
   physicsIterations: number;      // Physics solver iterations (more = stable, slower)
 
   // Post-processing
-  bloom: boolean;                 // Bloom effect
+  bloom: boolean;                 // Bloom effect (glow on bright areas)
+  bloomStrength: number;          // Bloom intensity (0.5 - 2.0)
   motionBlur: boolean;            // Motion blur effect
+  motionBlurSamples: number;      // Motion blur quality (8, 12, 16)
+  depthOfField: boolean;          // Depth of field (bokeh blur)
+  depthOfFieldAperture: number;   // DOF aperture (f-stop: 2.8 - 16)
+  ssao: boolean;                  // Screen-space ambient occlusion
+  ssaoSamples: number;            // SSAO quality (8, 16, 32)
+  colorGrading: boolean;          // Color grading LUT
+  colorGradingPreset: 'neutral' | 'arcade' | 'retro' | 'noir'; // Color grading style
+  chromaticAberration: boolean;   // Chromatic aberration (lens distortion)
   crtEffects: boolean;            // CRT shader effects (scanlines, chromatic aberration, vignette)
 
   // LOD settings
   lodBias: number;                // LOD distance multiplier (lower = more aggressive culling)
   maxDrawDistance: number;        // Maximum render distance in meters
+
+  // Skybox and lighting
+  skyboxEnabled: boolean;         // Enable skybox rendering
+  dynamicLighting: boolean;       // Enable time-of-day lighting changes
 }
 
 /**
@@ -61,16 +75,28 @@ export interface GraphicsSettings {
  */
 export const LOW_QUALITY: GraphicsSettings = {
   shadowMapSize: 512,
-  shadowsEnabled: true,
+  shadowsEnabled: false, // Disable shadows on low-end hardware
+  shadowType: 'basic',
   antialiasing: false,
   anisotropy: 1,
   maxParticles: 50,
   physicsIterations: 4,
   bloom: false,
+  bloomStrength: 0.5,
   motionBlur: false,
+  motionBlurSamples: 8,
+  depthOfField: false,
+  depthOfFieldAperture: 5.6,
+  ssao: false,
+  ssaoSamples: 8,
+  colorGrading: false,
+  colorGradingPreset: 'neutral',
+  chromaticAberration: false,
   crtEffects: false, // Disable CRT effects for low-end hardware
   lodBias: 0.5,
   maxDrawDistance: 300,
+  skyboxEnabled: true,
+  dynamicLighting: false, // Static lighting for performance
 };
 
 /**
@@ -83,15 +109,27 @@ export const LOW_QUALITY: GraphicsSettings = {
 export const MEDIUM_QUALITY: GraphicsSettings = {
   shadowMapSize: 1024,
   shadowsEnabled: true,
+  shadowType: 'pcf',
   antialiasing: true,
   anisotropy: 4,
   maxParticles: 200,
   physicsIterations: 6,
   bloom: true,
+  bloomStrength: 1.0,
   motionBlur: false,
+  motionBlurSamples: 12,
+  depthOfField: false,
+  depthOfFieldAperture: 5.6,
+  ssao: false,
+  ssaoSamples: 16,
+  colorGrading: true,
+  colorGradingPreset: 'arcade',
+  chromaticAberration: false,
   crtEffects: true, // Enable CRT effects for menu screens
   lodBias: 1.0,
   maxDrawDistance: 500,
+  skyboxEnabled: true,
+  dynamicLighting: true,
 };
 
 /**
@@ -104,15 +142,27 @@ export const MEDIUM_QUALITY: GraphicsSettings = {
 export const HIGH_QUALITY: GraphicsSettings = {
   shadowMapSize: 2048,
   shadowsEnabled: true,
+  shadowType: 'soft',
   antialiasing: true,
   anisotropy: 16,
   maxParticles: 500,
   physicsIterations: 8,
   bloom: true,
+  bloomStrength: 1.2,
   motionBlur: true,
+  motionBlurSamples: 12,
+  depthOfField: false, // Only on ULTRA (gameplay must be clear)
+  depthOfFieldAperture: 5.6,
+  ssao: true,
+  ssaoSamples: 16,
+  colorGrading: true,
+  colorGradingPreset: 'arcade',
+  chromaticAberration: false,
   crtEffects: true, // Full CRT effects enabled
   lodBias: 1.5,
   maxDrawDistance: 800,
+  skyboxEnabled: true,
+  dynamicLighting: true,
 };
 
 /**
@@ -123,15 +173,27 @@ export const HIGH_QUALITY: GraphicsSettings = {
 export const ULTRA_QUALITY: GraphicsSettings = {
   shadowMapSize: 4096,
   shadowsEnabled: true,
+  shadowType: 'soft',
   antialiasing: true,
   anisotropy: 16,
   maxParticles: 1000,
   physicsIterations: 10,
   bloom: true,
+  bloomStrength: 1.5,
   motionBlur: true,
+  motionBlurSamples: 16,
+  depthOfField: true, // Enable for cinematics only
+  depthOfFieldAperture: 2.8, // Wide aperture for shallow DOF
+  ssao: true,
+  ssaoSamples: 32,
+  colorGrading: true,
+  colorGradingPreset: 'arcade',
+  chromaticAberration: true, // ULTRA only
   crtEffects: true, // Maximum CRT effects
   lodBias: 2.0,
   maxDrawDistance: 1000,
+  skyboxEnabled: true,
+  dynamicLighting: true,
 };
 
 /**
@@ -244,15 +306,27 @@ export function validateSettings(settings: Partial<GraphicsSettings>): GraphicsS
   return {
     shadowMapSize: clamp(settings.shadowMapSize ?? base.shadowMapSize, 256, 4096),
     shadowsEnabled: settings.shadowsEnabled ?? base.shadowsEnabled,
+    shadowType: settings.shadowType ?? base.shadowType,
     antialiasing: settings.antialiasing ?? base.antialiasing,
     anisotropy: clamp(settings.anisotropy ?? base.anisotropy, 1, 16),
     maxParticles: clamp(settings.maxParticles ?? base.maxParticles, 10, 2000),
     physicsIterations: clamp(settings.physicsIterations ?? base.physicsIterations, 1, 20),
     bloom: settings.bloom ?? base.bloom,
+    bloomStrength: clamp(settings.bloomStrength ?? base.bloomStrength, 0.5, 2.0),
     motionBlur: settings.motionBlur ?? base.motionBlur,
+    motionBlurSamples: clamp(settings.motionBlurSamples ?? base.motionBlurSamples, 8, 16),
+    depthOfField: settings.depthOfField ?? base.depthOfField,
+    depthOfFieldAperture: clamp(settings.depthOfFieldAperture ?? base.depthOfFieldAperture, 2.8, 16),
+    ssao: settings.ssao ?? base.ssao,
+    ssaoSamples: clamp(settings.ssaoSamples ?? base.ssaoSamples, 8, 32),
+    colorGrading: settings.colorGrading ?? base.colorGrading,
+    colorGradingPreset: settings.colorGradingPreset ?? base.colorGradingPreset,
+    chromaticAberration: settings.chromaticAberration ?? base.chromaticAberration,
     crtEffects: settings.crtEffects ?? base.crtEffects,
     lodBias: clamp(settings.lodBias ?? base.lodBias, 0.1, 3.0),
     maxDrawDistance: clamp(settings.maxDrawDistance ?? base.maxDrawDistance, 100, 2000),
+    skyboxEnabled: settings.skyboxEnabled ?? base.skyboxEnabled,
+    dynamicLighting: settings.dynamicLighting ?? base.dynamicLighting,
   };
 }
 

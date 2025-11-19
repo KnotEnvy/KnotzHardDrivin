@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { EnvironmentSystem, ENVIRONMENT_QUALITY_PRESETS, EnvironmentQualitySettings } from '../systems/EnvironmentSystem';
+import { SkyboxSystem } from '../systems/SkyboxSystem';
+import { MaterialLibrary } from '../systems/MaterialLibrary';
+import type { TimeOfDay, SkyboxType } from '../types/SkyboxTypes';
 
 /**
  * SceneManager - Core Three.js scene setup and rendering
@@ -33,6 +36,10 @@ export class SceneManager {
   private environmentSystem!: EnvironmentSystem;
   private environmentInitialized: boolean = false;
 
+  // Skybox system
+  private skyboxSystem!: SkyboxSystem;
+  private skyboxEnabled: boolean = true;
+
   // Test object for camera following
   public testCube!: THREE.Mesh;
 
@@ -46,6 +53,7 @@ export class SceneManager {
     shadowMapSize?: number;
     antialiasing?: boolean;
     environmentQuality?: 'low' | 'medium' | 'high';
+    skyboxEnabled?: boolean;
   }) {
     // Initialize scene
     this.scene = new THREE.Scene();
@@ -71,6 +79,11 @@ export class SceneManager {
     this.setupLighting();
     this.createTestScene();
 
+    // Initialize PBR Material Library
+    const materialLib = MaterialLibrary.getInstance();
+    materialLib.init(this.scene);
+    console.log('✅ PBR Material Library initialized:', materialLib.getStats());
+
     // Initialize environment system asynchronously
     const envQuality = qualitySettings?.environmentQuality ?? 'medium';
     const envSettings = envQuality === 'low' ? ENVIRONMENT_QUALITY_PRESETS.LOW :
@@ -79,6 +92,11 @@ export class SceneManager {
 
     this.environmentSystem = new EnvironmentSystem(this.scene, this.camera, envSettings);
     this.initializeEnvironment();
+
+    // Initialize skybox system
+    this.skyboxEnabled = qualitySettings?.skyboxEnabled ?? true;
+    this.skyboxSystem = new SkyboxSystem(this.scene, this.renderer);
+    this.initializeSkybox();
 
     // Handle window resize - store bound reference for cleanup
     this.boundResizeHandler = this.onWindowResize.bind(this);
@@ -181,19 +199,53 @@ export class SceneManager {
   }
 
   /**
-   * Load actual skybox textures (for future use)
+   * Initialize skybox system with default settings
    *
-   * Usage:
-   * await sceneManager.loadSkyboxTextures([
-   *   'assets/skybox/px.jpg', 'assets/skybox/nx.jpg',
-   *   'assets/skybox/py.jpg', 'assets/skybox/ny.jpg',
-   *   'assets/skybox/pz.jpg', 'assets/skybox/nz.jpg',
-   * ]);
+   * Called asynchronously during construction.
    */
-  async loadSkyboxTextures(urls: string[]): Promise<void> {
-    const loader = new THREE.CubeTextureLoader();
-    const skybox = await loader.loadAsync(urls);
-    this.scene.background = skybox;
+  private async initializeSkybox(): Promise<void> {
+    if (!this.skyboxEnabled) {
+      console.log('⏭️ Skybox disabled by quality settings');
+      return;
+    }
+
+    try {
+      // Set default time of day and skybox
+      await this.skyboxSystem.setSkybox('day');
+      this.skyboxSystem.setTimeOfDay('day');
+      console.log('✅ Skybox system ready');
+    } catch (error) {
+      console.error('❌ Failed to initialize skybox:', error);
+    }
+  }
+
+  /**
+   * Set skybox type for the scene
+   *
+   * @param skyboxType - Skybox preset to use
+   */
+  async setSkybox(skyboxType: SkyboxType): Promise<void> {
+    if (!this.skyboxEnabled) {
+      console.warn('⚠️ Skybox disabled by quality settings');
+      return;
+    }
+    await this.skyboxSystem.setSkybox(skyboxType);
+  }
+
+  /**
+   * Set time of day and update lighting
+   *
+   * @param timeOfDay - Time of day preset
+   */
+  setTimeOfDay(timeOfDay: TimeOfDay): void {
+    this.skyboxSystem.setTimeOfDay(timeOfDay);
+  }
+
+  /**
+   * Get skybox system for external access
+   */
+  getSkyboxSystem(): SkyboxSystem {
+    return this.skyboxSystem;
   }
 
   /**
@@ -278,10 +330,16 @@ export class SceneManager {
    * Update shadow map resolution based on quality settings
    */
   setShadowMapSize(size: number): void {
-    this.sunLight.shadow.mapSize.width = size;
-    this.sunLight.shadow.mapSize.height = size;
-    this.sunLight.shadow.map?.dispose(); // Dispose old map
-    this.sunLight.shadow.map = null; // Force recreation
+    // Delegate to skybox system for shadow management
+    this.skyboxSystem.setShadowMapSize(size);
+
+    // Also update legacy sun light if it exists
+    if (this.sunLight) {
+      this.sunLight.shadow.mapSize.width = size;
+      this.sunLight.shadow.mapSize.height = size;
+      this.sunLight.shadow.map?.dispose();
+      this.sunLight.shadow.map = null;
+    }
   }
 
   /**
@@ -289,6 +347,7 @@ export class SceneManager {
    */
   setShadowsEnabled(enabled: boolean): void {
     this.renderer.shadowMap.enabled = enabled;
+    this.skyboxSystem.setShadowsEnabled(enabled);
   }
 
   /**
@@ -351,14 +410,25 @@ export class SceneManager {
    * - All Three.js geometries, materials, and textures
    * - Shadow maps
    * - Environment system
+   * - Skybox system
+   * - Material library
    */
   dispose(): void {
     // Remove event listeners using the stored bound reference
     window.removeEventListener('resize', this.boundResizeHandler);
 
+    // Dispose of material library
+    const materialLib = MaterialLibrary.getInstance();
+    materialLib.dispose();
+
     // Dispose of environment system
     if (this.environmentInitialized) {
       this.environmentSystem.dispose();
+    }
+
+    // Dispose of skybox system
+    if (this.skyboxSystem) {
+      this.skyboxSystem.dispose();
     }
 
     // Dispose of renderer

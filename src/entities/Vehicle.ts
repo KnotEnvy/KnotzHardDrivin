@@ -26,6 +26,7 @@ import {
 import { ReplayFrame } from '../systems/ReplayRecorder';
 import { VehicleModelType } from './models/VehicleModelTypes';
 import { VehicleModelFactory } from './models/VehicleModelFactory';
+import { DamageVisualizationSystem } from '../systems/DamageVisualizationSystem';
 
 /**
  * Vehicle class implementing full physics simulation with Rapier.js.
@@ -105,6 +106,18 @@ export class Vehicle {
   // Damage state
   private damageState: DamageState;
 
+  // Cached damage multipliers (updated when damage changes)
+  private damageMultipliers = {
+    speed: 1.0,
+    steering: 1.0,
+    acceleration: 1.0,
+    suspension: 1.0,
+  };
+
+  // Critical damage effects
+  private criticalDamageTimer: number = 0;
+  private engineSputterPhase: number = 0;
+
   // Visual damage system
   private originalChassisScale: Vector3 | null = null;
   private isCrashVisualsActive: boolean = false;
@@ -120,6 +133,9 @@ export class Vehicle {
 
   // Initialization flag
   private initialized: boolean = false;
+
+  // Damage visualization system reference
+  private damageVisSystem: DamageVisualizationSystem;
 
   /**
    * Creates a new vehicle instance.
@@ -185,6 +201,9 @@ export class Vehicle {
 
     // Start at idle RPM
     this.currentRPM = this.config.engine.idleRPM;
+
+    // Get damage visualization system instance
+    this.damageVisSystem = DamageVisualizationSystem.getInstance();
   }
 
   /**
@@ -232,6 +251,12 @@ export class Vehicle {
 
     // Create visual meshes
     this.createVisualMeshes();
+
+    // Register vehicle with damage visualization system
+    if (this.chassisMesh) {
+      this.damageVisSystem.registerVehicle(this.chassisMesh);
+      this.damageVisSystem.setScene(scene);
+    }
 
     this.initialized = true;
 
@@ -298,7 +323,10 @@ export class Vehicle {
     // 12. Update damage state
     this.updateDamage(deltaTime);
 
-    // 13. Update visual meshes to match physics
+    // 13. Update damage visualization particles
+    this.damageVisSystem.update(deltaTime);
+
+    // 14. Update visual meshes to match physics
     this.updateVisuals();
   }
 
@@ -387,6 +415,66 @@ export class Vehicle {
   }
 
   /**
+   * Gets the damage multiplier for a specific performance aspect.
+   *
+   * Multipliers are cached and updated when damage changes to avoid
+   * per-frame calculations. Performance: <0.01ms per call (cached lookup).
+   *
+   * Damage scaling:
+   * - PRISTINE (0-25%): Minimal impact
+   * - LIGHT (25-50%): Noticeable degradation
+   * - HEAVY (50-75%): Significant performance loss
+   * - DESTROYED (75-100%): Severe degradation
+   *
+   * @param damageType - Type of performance to query
+   * @returns Multiplier (1.0 = no penalty, 0.5 = 50% performance)
+   */
+  private getDamageMultiplier(
+    damageType: 'speed' | 'steering' | 'acceleration' | 'suspension'
+  ): number {
+    return this.damageMultipliers[damageType];
+  }
+
+  /**
+   * Updates cached damage multipliers based on current damage level.
+   *
+   * Uses smooth interpolation for gradual degradation rather than
+   * discrete steps. Called whenever damage state changes.
+   *
+   * Performance: <0.05ms per call (4 simple calculations)
+   */
+  private updateDamageMultipliers(): void {
+    const damage = this.damageState.overallDamage;
+
+    // Speed reduction: 0% at 0 damage → 50% at 100% damage
+    // Formula: 1.0 - (damage * 0.5)
+    this.damageMultipliers.speed = 1.0 - damage * 0.5;
+
+    // Steering reduction: 0% at 0 damage → 30% at 100% damage
+    // Formula: 1.0 - (damage * 0.3)
+    this.damageMultipliers.steering = 1.0 - damage * 0.3;
+
+    // Acceleration reduction: 0% at 0 damage → 40% at 100% damage
+    // Formula: 1.0 - (damage * 0.4)
+    this.damageMultipliers.acceleration = 1.0 - damage * 0.4;
+
+    // Suspension reduction: 0% at 0 damage → 40% at 100% damage
+    // Formula: 1.0 - (damage * 0.4)
+    this.damageMultipliers.suspension = 1.0 - damage * 0.4;
+
+    // Log critical damage warnings
+    if (damage >= 0.75 && damage < 0.75 + 0.05) {
+      // Only log once when crossing 75% threshold
+      console.warn(
+        `[CRITICAL DAMAGE] Vehicle at ${(damage * 100).toFixed(1)}% damage!`,
+        `Performance: Speed=${(this.damageMultipliers.speed * 100).toFixed(0)}%,`,
+        `Steering=${(this.damageMultipliers.steering * 100).toFixed(0)}%,`,
+        `Acceleration=${(this.damageMultipliers.acceleration * 100).toFixed(0)}%`
+      );
+    }
+  }
+
+  /**
    * Resets the vehicle to a new position and rotation.
    *
    * Clears velocities, damage, and resets state.
@@ -434,12 +522,22 @@ export class Vehicle {
       this.damageState.performancePenalty =
         this.damageState.overallDamage * this.config.damage.performanceDegradationPerLevel;
       this.updateDamageSeverity();
+      this.updateDamageMultipliers(); // Update cached multipliers after damage change
     }
+
+    // Reset critical damage timers
+    this.criticalDamageTimer = 0;
+    this.engineSputterPhase = 0;
 
     console.log('Vehicle reset to', position);
 
     // Reset visual crash effects when respawning
     this.resetCrashVisuals();
+
+    // Reset damage visualization system
+    if (this.chassisMesh) {
+      this.damageVisSystem.resetDamageVisuals(this.chassisMesh);
+    }
   }
 
   /**
@@ -623,6 +721,11 @@ export class Vehicle {
       this.world.removeCollider(this.collider, false);
       this.world.removeRigidBody(this.rigidBody);
 
+      // Unregister from damage visualization system
+      if (this.chassisMesh) {
+        this.damageVisSystem.unregisterVehicle(this.chassisMesh);
+      }
+
       // Clean up visual meshes
       this.disposeVisualMeshes();
 
@@ -742,6 +845,9 @@ export class Vehicle {
    * Applies suspension spring-damper forces to all wheels.
    */
   private applySuspensionForces(deltaTime: number): void {
+    // Get damage multiplier once per call (cached)
+    const suspensionMultiplier = this.getDamageMultiplier('suspension');
+
     for (let i = 0; i < 4; i++) {
       const wheelConfig = this.config.wheels[i];
       const wheelState = this.wheels[i];
@@ -766,8 +872,8 @@ export class Vehicle {
       // Damper force: F = c * v
       const damperForce = wheelConfig.suspensionDamping * wheelConfig.suspensionStiffness * compressionVel;
 
-      // Total suspension force
-      const totalForce = springForce - damperForce;
+      // Total suspension force (apply damage multiplier)
+      const totalForce = (springForce - damperForce) * suspensionMultiplier;
 
       // Clamp to prevent negative force (suspension can't pull)
       wheelState.suspensionForce = Math.max(0, totalForce);
@@ -892,11 +998,24 @@ export class Vehicle {
    * Applies tire forces (steering, drive, brake).
    */
   private applyTireForces(deltaTime: number): void {
-    // Calculate steering angle with speed sensitivity
+    // Calculate steering angle with speed sensitivity and damage
     const speed = this.cachedTransform.linearVelocity.length();
     const steeringFactor = 1.0 - (speed / 50.0) * ADVANCED_TUNING.speedSensitiveSteeringFactor;
+    const steeringMultiplier = this.getDamageMultiplier('steering');
+
+    // Critical damage effects (DESTROYED state: 75%+ damage)
+    let steeringDrift = 0;
+    if (this.damageState.overallDamage >= 0.75) {
+      // Update critical damage timer
+      this.criticalDamageTimer += deltaTime;
+
+      // Steering drift: small random torque to simulate alignment issues
+      // Oscillates slowly (0.5Hz) to create unpredictable handling
+      steeringDrift = Math.sin(this.criticalDamageTimer * Math.PI) * 0.05; // ±5% drift
+    }
+
     const targetSteeringAngle =
-      this.input.steering * this.config.wheels[0].maxSteeringAngle * Math.max(0.3, steeringFactor);
+      (this.input.steering + steeringDrift) * this.config.wheels[0].maxSteeringAngle * Math.max(0.3, steeringFactor) * steeringMultiplier;
 
     // Update steering for front wheels
     for (let i = 0; i < 2; i++) {
@@ -1073,9 +1192,23 @@ export class Vehicle {
 
     // Convert torque to force: F = T * gear_ratio / wheel_radius
     const wheelRadius = this.config.wheels[2].radius; // Use rear wheel
-    const force = (engineTorque * gearRatio) / wheelRadius;
+    let force = (engineTorque * gearRatio) / wheelRadius;
 
-    return force * (1.0 - this.damageState.performancePenalty);
+    // Apply acceleration damage multiplier
+    const accelerationMultiplier = this.getDamageMultiplier('acceleration');
+    force *= accelerationMultiplier;
+
+    // Critical damage: Engine sputter (DESTROYED state: 75%+ damage)
+    if (this.damageState.overallDamage >= 0.75) {
+      // Random power fluctuations every 0.5s (-20% sputter)
+      this.engineSputterPhase += 1.0 / 60.0; // Assuming 60Hz update
+      if (Math.floor(this.engineSputterPhase * 2) % 2 === 0) {
+        // Every 0.5 seconds, reduce power by 20%
+        force *= 0.8;
+      }
+    }
+
+    return force;
   }
 
   /**
@@ -1381,6 +1514,11 @@ export class Vehicle {
     console.log(
       `Collision: ${event.severity}, force: ${event.impactForce.toFixed(0)}N, damage: ${(this.damageState.overallDamage * 100).toFixed(1)}%`
     );
+
+    // Update damage visualization
+    if (this.chassisMesh) {
+      this.damageVisSystem.updateDamageVisuals(this.chassisMesh, this.damageState);
+    }
   }
 
   /**

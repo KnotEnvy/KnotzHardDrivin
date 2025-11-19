@@ -76,6 +76,7 @@ export class GameEngine {
 
   // Phase 7A: UI System
   private uiSystem: UISystem | null = null;
+  private selectedTrackId: string = 'track01'; // Default track
   private selectedVehicleType: 'corvette' | 'cybertruck' = 'corvette';
 
   // Phase 7B: Audio System
@@ -738,7 +739,29 @@ export class GameEngine {
         // Get top 5 leaderboard entries for display
         const leaderboard = this.leaderboardSystem.getLeaderboard().slice(0, 5);
 
-        // Prepare stats object for results screen
+        // Career Progression: Record completion and get star rating BEFORE showing results
+        const careerSystem = CareerProgressionSystem.getInstance();
+        const currentTrack = careerSystem.getCurrentTrack();
+        let starsEarned = 0;
+
+        if (currentTrack) {
+          const completionResult = careerSystem.recordCompletion(
+            currentTrack.id,
+            bestLapTime,
+            finalRaceTime,
+            stats.totalCrashes
+          );
+
+          starsEarned = completionResult.stars;
+
+          console.log('[CareerProgression] Race completion recorded for:', currentTrack.name);
+          console.log('[CareerProgression] Stars earned:', starsEarned);
+          if (completionResult.unlocked) {
+            console.log('[CareerProgression] New track unlocked!');
+          }
+        }
+
+        // Prepare stats object for results screen (now includes stars)
         const resultsStats = {
           bestLap: bestLapFormatted,
           lapsCompleted: lapTimes.length,
@@ -748,31 +771,22 @@ export class GameEngine {
           qualifiesForLeaderboard,
           leaderboardRank,
           leaderboardEntries: leaderboard,
+          stars: starsEarned,
         };
 
-        // Show results screen with collected data
+        // Show results screen with collected data (including stars)
         if (this.uiSystem) {
           this.uiSystem.showResults(finalTimeFormatted, resultsStats);
 
-          // Career Progression: Record completion and check for unlocks
-          const careerSystem = CareerProgressionSystem.getInstance();
-          const currentTrack = careerSystem.getCurrentTrack();
-
+          // Update UI to show unlock notification and next track button
           if (currentTrack) {
-            const trackUnlocked = careerSystem.recordCompletion(
+            const completionResult = careerSystem.recordCompletion(
               currentTrack.id,
               bestLapTime,
               finalRaceTime,
               stats.totalCrashes
             );
-
-            // Update UI to show unlock notification and next track button
-            this.uiSystem.updateCareerProgression(trackUnlocked);
-
-            console.log('[CareerProgression] Race completion recorded for:', currentTrack.name);
-            if (trackUnlocked) {
-              console.log('[CareerProgression] New track unlocked!');
-            }
+            this.uiSystem.updateCareerProgression(completionResult.unlocked);
           }
         }
 
@@ -925,10 +939,10 @@ export class GameEngine {
   private setupUIEventHandlers(): void {
     if (!this.uiSystem) return;
 
-    // Main Menu - Start button
+    // Main Menu - Start button (now goes to track selection)
     this.uiSystem.onButtonClick('btn-start', () => {
-      console.log('Start button clicked - showing car selection');
-      this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
+      console.log('Start button clicked - showing track selection');
+      this.showTrackSelection();
     });
 
     // Car Selection - Corvette
@@ -951,11 +965,11 @@ export class GameEngine {
 
     // Global keyboard shortcuts
     window.addEventListener('keydown', async (e) => {
-      // SPACE to start from menu (show car selection)
+      // SPACE to start from menu (show track selection)
       if (e.code === 'Space' && this.state === GameState.MENU) {
         e.preventDefault();
-        console.log('Space pressed - showing car selection');
-        this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
+        console.log('Space pressed - showing track selection');
+        this.showTrackSelection();
       }
 
       // ESC to navigate back or toggle pause
@@ -977,10 +991,14 @@ export class GameEngine {
             e.preventDefault();
             console.log('ESC pressed - returning to main menu');
             this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+          } else if (currentPanel === UIPanel.TRACK_SELECTION) {
+            e.preventDefault();
+            console.log('ESC pressed - returning to main menu from track selection');
+            this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
           } else if (currentPanel === UIPanel.CAR_SELECTION) {
             e.preventDefault();
-            console.log('ESC pressed - returning to main menu from car selection');
-            this.uiSystem?.showPanel(UIPanel.MAIN_MENU);
+            console.log('ESC pressed - returning to track selection from car selection');
+            this.showTrackSelection();
           }
         }
       }
@@ -1095,6 +1113,29 @@ export class GameEngine {
   /**
    * Shows the leaderboard screen with current entries
    */
+  /**
+   * Shows track selection screen and populates with available tracks
+   */
+  private showTrackSelection(): void {
+    if (!this.uiSystem) return;
+
+    // Show track selection panel
+    this.uiSystem.showPanel(UIPanel.TRACK_SELECTION);
+
+    // Populate track selection with callback for track selection
+    this.uiSystem.populateTrackSelection((trackId: string) => {
+      console.log('Track selected:', trackId);
+      this.selectedTrackId = trackId;
+
+      // Set the track as current in career system
+      const career = CareerProgressionSystem.getInstance();
+      career.setCurrentTrack(trackId);
+
+      // Proceed to car selection
+      this.uiSystem?.showPanel(UIPanel.CAR_SELECTION);
+    });
+  }
+
   private showLeaderboard(): void {
     if (!this.uiSystem) return;
 
@@ -1556,8 +1597,25 @@ export class GameEngine {
         return;
       }
 
-      // Create track with visual mesh and physics collider
-      this.track = new Track(trackData, this.physicsWorld, this.sceneManager.scene);
+      // Create track with visual mesh, physics collider, and scenery
+      this.track = new Track(trackData, this.physicsWorld, this.sceneManager.scene, this.sceneManager.camera);
+
+      // Apply track-specific skybox and lighting
+      if (trackData.skybox) {
+        await this.sceneManager.setSkybox(trackData.skybox as any);
+        console.log(`✅ Skybox set to: ${trackData.skybox}`);
+      }
+      if (trackData.timeOfDay) {
+        this.sceneManager.setTimeOfDay(trackData.timeOfDay as any);
+        console.log(`✅ Lighting set to: ${trackData.timeOfDay}`);
+      }
+
+      // Update shadow frustum to fit track bounds
+      const trackBounds = this.track.getBounds();
+      if (trackBounds) {
+        this.sceneManager.getSkyboxSystem().updateShadowFrustum(trackBounds);
+        console.log('✅ Shadow frustum updated for track bounds');
+      }
 
       // DEBUG: Add collision mesh visualization (shows physics geometry as green wireframe)
       // This helps identify invisible walls and collision issues
@@ -1623,6 +1681,7 @@ export class GameEngine {
       this.crashManager.init(
         this.vehicle,
         this.track,
+        this.cameraSystem, // Pass camera system for shake effects
         (state: GameState) => this.setState(state)
       );
 

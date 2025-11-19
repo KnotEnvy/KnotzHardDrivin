@@ -1,26 +1,33 @@
 {
-  "name": "Alpine Figure-8 Circuit",
+  "name": "Extreme Stunt Circuit - Loop & Jump",
   "width": 12,
+  "skybox": "sunset",
+  "timeOfDay": "sunset",
+  "background": "mountain",
   "sections": [
     {
       "type": "straight",
-      "length": 80
-    },
-    {
-      "type": "curve",
-      "radius": 40,
-      "angle": 45
+      "length": 60
     },
     {
       "type": "ramp",
-      "length": 60,
-      "height": 15
+      "length": 40,
+      "height": 8
+    },
+    {
+      "type": "straight",
+      "length": 30
+    },
+    {
+      "type": "ramp",
+      "length": 35,
+      "height": -5
     },
     {
       "type": "bank",
-      "radius": 35,
-      "angle": 90,
-      "banking": 20
+      "radius": 40,
+      "angle": 45,
+      "banking": 22
     },
     {
       "type": "straight",
@@ -29,7 +36,7 @@
     {
       "type": "curve",
       "radius": 30,
-      "angle": -135
+      "angle": -90
     },
     {
       "type": "straight",
@@ -37,32 +44,48 @@
     },
     {
       "type": "ramp",
-      "length": 50,
-      "height": -12
+      "length": 30,
+      "height": 6
     },
     {
-      "type": "curve",
-      "radius": 45,
-      "angle": -90
-    },
-    {
-      "type": "straight",
-      "length": 60
+      "type": "ramp",
+      "length": 25,
+      "height": -6
     },
     {
       "type": "bank",
-      "radius": 38,
-      "angle": 135,
-      "banking": 18
+      "radius": 45,
+      "angle": -75,
+      "banking": 28
     },
     {
       "type": "straight",
       "length": 45
     },
     {
+      "type": "ramp",
+      "length": 50,
+      "height": 10
+    },
+    {
+      "type": "straight",
+      "length": 35
+    },
+    {
+      "type": "ramp",
+      "length": 50,
+      "height": -8
+    },
+    {
       "type": "curve",
-      "radius": 32,
-      "angle": -90
+      "radius": 35,
+      "angle": 60
+    },
+    {
+      "type": "bank",
+      "radius": 38,
+      "angle": 90,
+      "banking": 30
     },
     {
       "type": "straight",
@@ -70,127 +93,170 @@
     },
     {
       "type": "curve",
-      "radius": 35,
-      "angle": 45
-    }
-  ],
-  "waypoints": [
-    {
-      "id": 0,
-      "position": [0, 0, 10],
-      "direction": [0, 0, 1],
-      "triggerRadius": 14,
-      "isCheckpoint": true,
-      "timeBonus": 35
-    },
-    {
-      "id": 1,
-      "position": [0, 0, 80],
-      "direction": [0, 0, 1],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 2,
-      "position": [30, 0, 110],
-      "direction": [1, 0, 0.5],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 3,
-      "position": [50, 10, 140],
-      "direction": [0.7, 0.3, 0.7],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 4,
-      "position": [85, 15, 165],
-      "direction": [1, 0, 0],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 5,
-      "position": [120, 15, 140],
-      "direction": [0, 0, -1],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 6,
-      "position": [120, 15, 90],
-      "direction": [0, 0, -1],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 7,
-      "position": [85, 15, 55],
-      "direction": [-1, 0, -0.7],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 8,
-      "position": [60, 5, 30],
-      "direction": [-0.7, -0.2, -0.7],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 9,
-      "position": [30, 3, 10],
-      "direction": [-1, 0, 0],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 10,
-      "position": [-5, 3, 30],
-      "direction": [-0.7, 0, 1],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 11,
-      "position": [-25, 3, 65],
-      "direction": [0, 0, 1],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 12,
-      "position": [-5, 3, 95],
-      "direction": [1, 0, 0.5],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 13,
-      "position": [15, 2, 120],
-      "direction": [0.7, 0, 0.7],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 14,
-      "position": [35, 1, 140],
-      "direction": [1, 0, 0.5],
-      "triggerRadius": 14,
-      "isCheckpoint": false
-    },
-    {
-      "id": 15,
-      "position": [25, 0.5, 30],
-      "direction": [0.5, 0, -0.7],
-      "triggerRadius": 14,
-      "isCheckpoint": false
+      "radius": 32,
+      "angle": -60
     }
   ],
   "spawnPoint": {
     "position": [0, 2, 5],
     "rotation": [0, 0, 0, 1]
-  }
+  },
+  "obstacles": [
+    {
+      "type": "cone",
+      "position": [5, 0.3, 20]
+    },
+    {
+      "type": "cone",
+      "position": [-5, 0.3, 20]
+    },
+    {
+      "type": "barrier",
+      "position": [0, 0.3, 50]
+    },
+    {
+      "type": "tire_wall",
+      "position": [8, 8.5, 100]
+    },
+    {
+      "type": "cone",
+      "position": [15, 8.3, 120]
+    },
+    {
+      "type": "cone",
+      "position": [-10, 3.3, 180]
+    },
+    {
+      "type": "barrier",
+      "position": [25, 3.3, 200]
+    },
+    {
+      "type": "cone",
+      "position": [40, 6.3, 250]
+    },
+    {
+      "type": "tire_wall",
+      "position": [50, 10.5, 300]
+    },
+    {
+      "type": "barrier",
+      "position": [30, 10.3, 330]
+    },
+    {
+      "type": "cone",
+      "position": [10, 2.3, 360]
+    },
+    {
+      "type": "cone",
+      "position": [-5, 2.3, 380]
+    }
+  ],
+  "scenery": [
+    {
+      "type": "grandstand",
+      "position": [-25, 6, -10],
+      "rotation": 80,
+      "scale": 1.5
+    },
+    {
+      "type": "grandstand",
+      "position": [70, 8, 120],
+      "rotation": 0,
+      "scale": 1.0
+    },
+    {
+      "type": "grandstand",
+      "position": [-50, 4, 200],
+      "rotation": -45,
+      "scale": 1.2
+    },
+    {
+      "type": "tire_wall_barrier",
+      "start": [-10, 0.5, 0],
+      "end": [-10, 0.5, 60]
+    },
+    {
+      "type": "tire_wall_barrier",
+      "start": [22, 0.5, 0],
+      "end": [22, 0.5, 50]
+    },
+    {
+      "type": "concrete_barrier",
+      "start": [-15, 8.5, 80],
+      "end": [30, 8.5, 130]
+    },
+    {
+      "type": "safety_fence",
+      "start": [60, 3, 180],
+      "end": [90, 3, 250]
+    },
+    {
+      "type": "safety_fence",
+      "start": [-20, 2, 320],
+      "end": [20, 2, 380]
+    },
+    {
+      "type": "tree",
+      "position": [-60, 0, 50],
+      "instanceCount": 25,
+      "spread": 100
+    },
+    {
+      "type": "tree",
+      "position": [100, 0, 200],
+      "instanceCount": 30,
+      "spread": 120
+    },
+    {
+      "type": "tree",
+      "position": [-80, 0, 300],
+      "instanceCount": 20,
+      "spread": 80
+    },
+    {
+      "type": "rock",
+      "position": [80, 8, 100],
+      "instanceCount": 12,
+      "spread": 40
+    },
+    {
+      "type": "rock",
+      "position": [-40, 2, 250],
+      "instanceCount": 10,
+      "spread": 35
+    },
+    {
+      "type": "flag",
+      "position": [-2, 0.5, -8],
+      "scale": 1.8
+    },
+    {
+      "type": "flag",
+      "position": [8, 0.5, -8],
+      "scale": 1.8
+    },
+    {
+      "type": "banner",
+      "position": [0, 8.5, 100],
+      "scale": 2.0
+    },
+    {
+      "type": "building",
+      "position": [-90, 6, 0],
+      "rotation": 60,
+      "scale": 1.2
+    },
+    {
+      "type": "building",
+      "position": [120, 6, 220],
+      "rotation": -20,
+      "scale": 0.9
+    },
+    {
+      "type": "building",
+      "position": [-100, 6, 350],
+      "rotation": 30,
+      "scale": 1.0
+    }
+  ]
 }

@@ -4,6 +4,8 @@ import { Track } from '../entities/Track';
 import { GameState } from '../core/GameEngine';
 import { DamageSeverity } from '../types/VehicleTypes';
 import { TimerSystem } from './TimerSystem';
+import { DamageVisualizationSystem } from './DamageVisualizationSystem';
+import { CameraSystem } from './CameraSystem';
 
 /**
  * Crash severity classification based on impact force.
@@ -185,6 +187,11 @@ export class CrashManager {
   private track: Track | null = null;
 
   /**
+   * Reference to camera system for shake effects.
+   */
+  private cameraSystem: CameraSystem | null = null;
+
+  /**
    * Callback to trigger state transitions in GameEngine.
    * Will be called with GameState.CRASHED when major crash detected.
    */
@@ -223,6 +230,7 @@ export class CrashManager {
    *
    * @param vehicle - Vehicle instance to monitor for crashes
    * @param track - Track instance for collision context
+   * @param cameraSystem - Camera system for shake effects
    * @param stateTransitionCallback - Function to call for state transitions
    *
    * @example
@@ -230,6 +238,7 @@ export class CrashManager {
    * crashManager.init(
    *   gameEngine.getVehicle(),
    *   gameEngine.getTrack(),
+   *   gameEngine.getCameraSystem(),
    *   (state) => gameEngine.setState(state)
    * );
    * ```
@@ -237,10 +246,12 @@ export class CrashManager {
   init(
     vehicle: Vehicle,
     track: Track,
+    cameraSystem: CameraSystem,
     stateTransitionCallback: (state: GameState) => void
   ): void {
     this.vehicle = vehicle;
     this.track = track;
+    this.cameraSystem = cameraSystem;
     this.stateTransitionCallback = stateTransitionCallback;
     this.enabled = true;
     this.lastReplayTriggerTime = -this.CRASH_REPLAY_COOLDOWN;
@@ -251,7 +262,7 @@ export class CrashManager {
     const transform = vehicle.getTransform();
     this.previousVelocity.copy(transform.linearVelocity);
 
-    console.log('CrashManager initialized');
+    console.log('CrashManager initialized with crash effects support');
   }
 
   /**
@@ -381,6 +392,9 @@ export class CrashManager {
     // Update vehicle damage
     this.applyDamage(crashEvent);
 
+    // Trigger crash effects (particles + camera shake)
+    this.triggerCrashVisualEffects(crashEvent);
+
     // Trigger replay if major crash and not in cooldown
     if (crashEvent.shouldReplay && this.isReplayAvailable()) {
       this.triggerReplaySequence(crashEvent);
@@ -448,6 +462,9 @@ export class CrashManager {
     // Notify listeners and apply damage
     this.notifyCrashEvent(crashEvent);
     this.applyDamage(crashEvent);
+
+    // Trigger crash effects (particles + camera shake)
+    this.triggerCrashVisualEffects(crashEvent);
 
     // Trigger replay if warranted
     if (crashEvent.shouldReplay && this.isReplayAvailable()) {
@@ -623,6 +640,72 @@ export class CrashManager {
         return DamageSeverity.SEVERE;
       case CrashSeverity.CATASTROPHIC:
         return DamageSeverity.CATASTROPHIC;
+    }
+  }
+
+  /**
+   * Triggers crash visual effects (particles + camera shake).
+   *
+   * Called for ALL crashes (minor, major, catastrophic) to provide
+   * immediate visual feedback. Effects scale with crash severity:
+   *
+   * MINOR:
+   * - 15 sparks, 5 debris pieces
+   * - Camera shake: 0.3 intensity, 0.5s duration
+   *
+   * MAJOR:
+   * - 30 sparks, 15 debris pieces
+   * - Camera shake: 0.6 intensity, 1.0s duration
+   *
+   * CATASTROPHIC:
+   * - 50 sparks, 25 debris pieces
+   * - Camera shake: 1.0 intensity, 1.5s duration
+   *
+   * Performance: <2ms total (particle emission + shake trigger)
+   *
+   * @param crashEvent - Crash event with position, normal, velocity, severity
+   */
+  private triggerCrashVisualEffects(crashEvent: CrashEvent): void {
+    // Get damage visualization system for particle effects
+    const damageSystem = DamageVisualizationSystem.getInstance();
+
+    // Map CrashSeverity to particle severity string
+    let particleSeverity: 'minor' | 'major' | 'catastrophic' = 'minor';
+    let shakeIntensity = 0.3;
+    let shakeDuration = 0.5;
+
+    switch (crashEvent.severity) {
+      case CrashSeverity.MINOR:
+        particleSeverity = 'minor';
+        shakeIntensity = 0.3;
+        shakeDuration = 0.5;
+        break;
+      case CrashSeverity.MAJOR:
+        particleSeverity = 'major';
+        shakeIntensity = 0.6;
+        shakeDuration = 1.0;
+        break;
+      case CrashSeverity.CATASTROPHIC:
+        particleSeverity = 'catastrophic';
+        shakeIntensity = 1.0;
+        shakeDuration = 1.5;
+        break;
+      case CrashSeverity.NONE:
+        // No effects for minor bumps
+        return;
+    }
+
+    // Trigger particle effects (sparks + debris)
+    damageSystem.triggerCrashEffects(
+      crashEvent.position,
+      crashEvent.collisionNormal,
+      crashEvent.velocity,
+      particleSeverity
+    );
+
+    // Trigger camera shake
+    if (this.cameraSystem) {
+      this.cameraSystem.applyCameraShake(shakeIntensity, shakeDuration);
     }
   }
 
