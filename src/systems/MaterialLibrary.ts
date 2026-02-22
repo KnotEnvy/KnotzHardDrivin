@@ -295,11 +295,11 @@ export class MaterialLibrary {
       name: 'headlight',
       color: 0xffffff,
       metalness: 0.0,
-      roughness: 0.1,
+      roughness: 0.05,
       transparent: true,
       opacity: 0.8,
-      emissive: 0xffffcc,
-      emissiveIntensity: 0.5,
+      emissive: 0xffffff,
+      emissiveIntensity: 1.5, // Increased for Bloom
     }));
 
     // Taillight glass - Red emissive
@@ -307,11 +307,11 @@ export class MaterialLibrary {
       name: 'taillight',
       color: 0xff0000,
       metalness: 0.0,
-      roughness: 0.1,
+      roughness: 0.05,
       transparent: true,
       opacity: 0.8,
       emissive: 0xff0000,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 1.0, // Increased for Bloom
     }));
   }
 
@@ -321,23 +321,31 @@ export class MaterialLibrary {
    * Materials for asphalt, concrete, barriers, painted lines
    */
   private createTrackMaterials(): void {
-    // Asphalt - Dark, rough surface
+    const asphaltTex = this.createProceduralAsphaltTexture();
+    const concreteTex = this.createProceduralConcreteTexture();
+
+    // Asphalt - Dark, rough surface with textures
     this.materials.set('asphalt', this.createMaterial({
       name: 'asphalt',
-      color: 0x2a2a2a,
-      metalness: 0.0,  // Asphalt is non-metallic
-      roughness: 0.85, // Rough surface
-      envMapIntensity: 0.1,
+      color: 0x444444, // Base color offset by texture
+      metalness: 0.1,
+      roughness: 0.85,
+      envMapIntensity: 0.2,
     }));
+    // Override map manually since createMaterial expects string path
+    this.materials.get('asphalt')!.map = asphaltTex;
+    this.materials.get('asphalt')!.needsUpdate = true;
 
-    // Concrete - Light gray, moderate roughness
+    // Concrete - Light gray, textured
     this.materials.set('concrete', this.createMaterial({
       name: 'concrete',
-      color: 0x999999,
+      color: 0xa0a0a0,
       metalness: 0.0,
       roughness: 0.7,
-      envMapIntensity: 0.15,
+      envMapIntensity: 0.2,
     }));
+    this.materials.get('concrete')!.map = concreteTex;
+    this.materials.get('concrete')!.needsUpdate = true;
 
     // Concrete barrier - Jersey barrier style
     this.materials.set('concrete_barrier', this.createMaterial({
@@ -347,6 +355,8 @@ export class MaterialLibrary {
       roughness: 0.9,
       envMapIntensity: 0.1,
     }));
+    this.materials.get('concrete_barrier')!.map = concreteTex;
+    this.materials.get('concrete_barrier')!.needsUpdate = true;
 
     // Metal barrier - Galvanized steel
     this.materials.set('metal_barrier', this.createMaterial({
@@ -363,26 +373,23 @@ export class MaterialLibrary {
       color: 0xffffff,
       metalness: 0.0,
       roughness: 0.6,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.1, // Slight glow for visibility
+      emissive: 0x222222,
     }));
 
-    // Painted line - Yellow center line
+    // Painted line - Yellow line markings
     this.materials.set('painted_line_yellow', this.createMaterial({
       name: 'painted_line_yellow',
-      color: 0xffff00,
+      color: 0xffaa00,
       metalness: 0.0,
       roughness: 0.6,
-      emissive: 0xffff00,
-      emissiveIntensity: 0.1,
+      emissive: 0x221100,
     }));
 
-    // Grass/dirt offtrack - Green, very rough
     this.materials.set('grass', this.createMaterial({
       name: 'grass',
-      color: 0x2d5016,
+      color: 0xffffff,
       metalness: 0.0,
-      roughness: 0.95,
+      roughness: 1.0,
       envMapIntensity: 0.05,
     }));
 
@@ -393,6 +400,74 @@ export class MaterialLibrary {
       roughness: 0.9,
       envMapIntensity: 0.1,
     }));
+  }
+
+  /**
+   * Generates a high-frequency noise texture for asphalt
+   */
+  private createProceduralAsphaltTexture(): THREE.Texture {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const imgData = ctx.createImageData(size, size);
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      // High-frequency noise for macadam texture
+      const noise = Math.random();
+      const val = Math.floor(60 + noise * 40); // Dark gray range
+
+      imgData.data[i] = val;     // R
+      imgData.data[i + 1] = val; // G
+      imgData.data[i + 2] = val; // B
+      imgData.data[i + 3] = 255; // A
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(100, 100);
+    texture.anisotropy = 4;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  /**
+   * Generates a noise texture for concrete surfaces
+   */
+  private createProceduralConcreteTexture(): THREE.Texture {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const imgData = ctx.createImageData(size, size);
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      // Low-frequency noise for concrete blotches
+      const x = (i / 4) % size;
+      const y = Math.floor((i / 4) / size);
+      const nx = x / size, ny = y / size;
+
+      const n1 = Math.sin(nx * 50 + ny * 30 + Math.random() * 2);
+      const val = Math.floor(160 + n1 * 10 + Math.random() * 15); // Light gray range
+
+      imgData.data[i] = val;     // R
+      imgData.data[i + 1] = val; // G
+      imgData.data[i + 2] = val; // B
+      imgData.data[i + 3] = 255; // A
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(50, 50);
+    texture.anisotropy = 4;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
   }
 
   /**

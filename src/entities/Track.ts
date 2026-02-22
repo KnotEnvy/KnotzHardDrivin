@@ -547,6 +547,22 @@ export class Track {
     // Texture tiling: repeats texture every ~2 units for consistent appearance
     const textureScale = 2.0;
 
+    // Define advanced track profile (Left to right)
+    // mat: 0: asphalt, 1: white line, 2: yellow line, 3: concrete, 4: wall
+    const profile = [
+      { x: -width / 2 - 1.5, y: 1.5, u: 0.0, mat: 4 }, // 0: Left Wall Top
+      { x: -width / 2 - 1.5, y: 0.0, u: 0.1, mat: 3 }, // 1: Left Wall Base
+      { x: -width / 2 - 0.2, y: 0.0, u: 0.2, mat: 1 }, // 2: Left Apron Edge
+      { x: -width / 2, y: 0.0, u: 0.25, mat: 0 }, // 3: Left White Line
+      { x: 0, y: 0.0, u: 0.5, mat: 0 }, // 4: Center
+      { x: width / 2, y: 0.0, u: 0.75, mat: 1 }, // 5: Right White Line
+      { x: width / 2 + 0.2, y: 0.0, u: 0.8, mat: 3 }, // 6: Right Apron Edge
+      { x: width / 2 + 1.5, y: 0.0, u: 0.9, mat: 4 }, // 7: Right Wall Base
+      { x: width / 2 + 1.5, y: 1.5, u: 1.0, mat: -1 }  // 8: Right Wall Top
+    ];
+
+    const indicesByMaterial: number[][] = [[], [], [], [], []];
+
     // Generate vertices for all spline points
     // For closed loops, we'll handle the wraparound in the index generation
     const numSegments = points.length - 1; // Don't create duplicate vertex at loop end
@@ -563,24 +579,16 @@ export class Track {
       const bankingAngle = this.getBankingAtParameter(t);
 
       // Create proper coordinate frame for the track cross-section
-      // 1. Start with world up vector
       const worldUp = this.tempVec1.set(0, 1, 0);
-
-      // 2. Calculate binormal (perpendicular to tangent, initially in horizontal plane)
       let binormal = this.tempVec2.crossVectors(worldUp, tangent).normalize();
 
-      // Handle case where tangent is parallel to world up (vertical sections)
       if (binormal.lengthSq() < 0.001) {
-        // Use a fallback binormal for vertical sections
         binormal.set(1, 0, 0);
       }
 
-      // 3. Calculate proper normal (perpendicular to both tangent and binormal)
       const normal = this.tempVec3.crossVectors(tangent, binormal).normalize();
 
-      // 4. Apply banking rotation around the tangent vector
       if (Math.abs(bankingAngle) > 0.001) {
-        // Rotate binormal and normal around tangent by banking angle
         const cosBank = Math.cos(bankingAngle);
         const sinBank = Math.sin(bankingAngle);
 
@@ -596,46 +604,45 @@ export class Track {
         normal.copy(normalBanked).normalize();
       }
 
-      // Create left and right edges using banked binormal
-      const leftEdge = new THREE.Vector3().copy(point).add(
-        binormal.clone().multiplyScalar(-width / 2)
-      );
-      const rightEdge = new THREE.Vector3().copy(point).add(
-        binormal.clone().multiplyScalar(width / 2)
-      );
+      for (const p of profile) {
+        // Offset using binormal (X) and normal (Y)
+        const trackPoint = new THREE.Vector3().copy(point)
+          .add(binormal.clone().multiplyScalar(p.x))
+          .add(normal.clone().multiplyScalar(p.y));
 
-      // Add vertices
-      vertices.push(leftEdge.x, leftEdge.y, leftEdge.z);
-      vertices.push(rightEdge.x, rightEdge.y, rightEdge.z);
+        vertices.push(trackPoint.x, trackPoint.y, trackPoint.z);
 
-      // Calculate UV coordinates using accumulated distance
-      // V: continuous distance-based coordinate that repeats smoothly
-      // Divide accumulated distance by textureScale to create regular tiling
-      // This creates texture repetition every textureScale units of track distance
-      const vCoord = distanceAccum[i] / textureScale;
+        // U comes from profile, V from distance
+        const vCoord = distanceAccum[i] / textureScale;
+        uvs.push(p.u, vCoord);
 
-      // U: left edge at 0, right edge at 1 for proper width mapping
-      uvs.push(0, vCoord); // Left edge
-      uvs.push(1, vCoord); // Right edge
-
-      // Add normals (use calculated normal for proper lighting on banked sections)
-      normals.push(normal.x, normal.y, normal.z);
-      normals.push(normal.x, normal.y, normal.z);
+        // Normal computation logic:
+        if (p.y > 0 && p.x < 0) {
+          // Left wall normal faces right (approximated by binormal)
+          normals.push(binormal.x, binormal.y, binormal.z);
+        } else if (p.y > 0 && p.x > 0) {
+          // Right wall normal faces left
+          normals.push(-binormal.x, -binormal.y, -binormal.z);
+        } else {
+          normals.push(normal.x, normal.y, normal.z);
+        }
+      }
     }
 
     // Generate indices to create triangle pairs
-    // For closed loops, the last segment wraps back to the first
     for (let i = 0; i < numSegments; i++) {
-      const base = i * 2;
+      const base = i * profile.length;
+      const nextBase = ((i + 1) % numSegments) * profile.length;
 
-      // Calculate indices for the next segment, wrapping around for closed loops
-      const nextBase = ((i + 1) % numSegments) * 2;
-
-      // First triangle (left edge of current, right edge of current, left edge of next)
-      indices.push(base, base + 1, nextBase);
-
-      // Second triangle (right edge of current, right edge of next, left edge of next)
-      indices.push(base + 1, nextBase + 1, nextBase);
+      for (let j = 0; j < profile.length - 1; j++) {
+        const mat = profile[j].mat;
+        if (mat >= 0) {
+          // Triangle 1
+          indicesByMaterial[mat].push(base + j, base + j + 1, nextBase + j);
+          // Triangle 2
+          indicesByMaterial[mat].push(base + j + 1, nextBase + j + 1, nextBase + j);
+        }
+      }
     }
 
     // Set geometry attributes
@@ -648,28 +655,40 @@ export class Track {
       'normal',
       new THREE.Float32BufferAttribute(normals, 3)
     );
-    geometry.setIndex(indices);
+    const allIndices: number[] = [];
+
+    // Create material using PBR Material Library
+    const materialLib = MaterialLibrary.getInstance();
+    const defaultMat = new THREE.MeshStandardMaterial({
+      color: 0x2a2a2a,
+      roughness: 0.85,
+      metalness: 0.0,
+      side: THREE.FrontSide,
+    });
+
+    const materials = [
+      materialLib.getMaterial('asphalt') || defaultMat,
+      materialLib.getMaterial('painted_line_white') || defaultMat,
+      materialLib.getMaterial('painted_line_yellow') || defaultMat,
+      materialLib.getMaterial('concrete') || defaultMat,
+      materialLib.getMaterial('concrete_barrier') || defaultMat
+    ];
+
+    for (let m = 0; m < materials.length; m++) {
+      const start = allIndices.length;
+      const count = indicesByMaterial[m].length;
+      allIndices.push(...indicesByMaterial[m]);
+      if (count > 0) {
+        geometry.addGroup(start, count, m);
+      }
+    }
+
+    geometry.setIndex(allIndices);
 
     // Compute vertex normals for smooth shading
     geometry.computeVertexNormals();
 
-    // Create material using PBR Material Library
-    const materialLib = MaterialLibrary.getInstance();
-    let material = materialLib.getMaterial('asphalt');
-
-    // Fallback to basic material if library not initialized
-    if (!material) {
-      material = new THREE.MeshStandardMaterial({
-        color: 0x2a2a2a, // Dark asphalt
-        roughness: 0.85, // Rough asphalt surface
-        metalness: 0.0, // Non-metallic
-        side: THREE.FrontSide,
-        flatShading: false,
-        wireframe: false,
-      });
-    }
-
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(geometry, materials);
     mesh.receiveShadow = true;
     mesh.castShadow = false; // Track doesn't cast shadows
     mesh.name = 'track-mesh';
@@ -936,8 +955,8 @@ export class Track {
     for (const data of obstacleData) {
       const position = new THREE.Vector3(data.position[0], data.position[1], data.position[2]);
       const obstacleType = data.type === 'cone' ? ObstacleType.CONE :
-                          data.type === 'barrier' ? ObstacleType.BARRIER :
-                          ObstacleType.TIRE_WALL;
+        data.type === 'barrier' ? ObstacleType.BARRIER :
+          ObstacleType.TIRE_WALL;
 
       const obstacle = new Obstacle(obstacleType, position, world, scene);
       this.obstacles.push(obstacle);

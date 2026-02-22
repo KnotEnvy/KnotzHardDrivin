@@ -29,7 +29,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: transparent; /* Changed from #000000 to show 3D car */
+  background: transparent;
+  /* Changed from #000000 to show 3D car */
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -49,13 +50,10 @@
   height: 100%;
   pointer-events: none;
   z-index: 1;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 0%,
-    transparent 85%,
-    rgba(0, 0, 0, 0.05) 95%,
-    rgba(0, 0, 0, 0.1) 100%
-  );
+  background: radial-gradient(circle at center,
+      transparent 20%,
+      rgba(0, 0, 0, 0.2) 70%,
+      rgba(0, 0, 0, 0.6) 100%);
 }
 
 /* ========================================
@@ -71,19 +69,18 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    135deg,
-    #000000 0%,
-    #001a0f 20%,
-    #000a14 40%,
-    #0a0014 60%,
-    #001a0f 80%,
-    #000000 100%
-  );
+  background: linear-gradient(135deg,
+      #000000 0%,
+      #001a0f 20%,
+      #000a14 40%,
+      #0a0014 60%,
+      #001a0f 80%,
+      #000000 100%);
   background-size: 400% 400%;
   pointer-events: none;
   animation: gradientShift 20s ease-in-out infinite;
-  opacity: 0.15; /* Reduced from 0.6 to let 3D car show through */
+  opacity: 0.15;
+  /* Reduced from 0.6 to let 3D car show through */
   z-index: 1;
 }
 
@@ -91,15 +88,19 @@
   0% {
     background-position: 0% 50%;
   }
+
   25% {
     background-position: 50% 75%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   75% {
     background-position: 50% 25%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -114,20 +115,16 @@
   width: 100%;
   height: 100%;
   background-image:
-    repeating-linear-gradient(
-      90deg,
+    repeating-linear-gradient(90deg,
       transparent 0px,
       transparent 8px,
       rgba(0, 255, 136, 0.05) 8px,
-      rgba(0, 255, 136, 0.05) 10px
-    ),
-    repeating-linear-gradient(
-      45deg,
+      rgba(0, 255, 136, 0.05) 10px),
+    repeating-linear-gradient(45deg,
       transparent 0px,
       transparent 20px,
       rgba(0, 255, 136, 0.03) 20px,
-      rgba(0, 255, 136, 0.03) 21px
-    );
+      rgba(0, 255, 136, 0.03) 21px);
   background-size: 100% 100%, 200% 200%;
   background-position: center, 0% 0%;
   pointer-events: none;
@@ -141,10 +138,12 @@
     background-position: center, 0% 0%;
     opacity: 0.3;
   }
+
   50% {
     background-position: center, 100% 100%;
     opacity: 0.6;
   }
+
   100% {
     background-position: center, 200% 200%;
     opacity: 0.3;
@@ -168,15 +167,13 @@
   letter-spacing: 0.08em;
 
   /* Metallic chrome gradient text */
-  background: linear-gradient(
-    180deg,
-    #00ff88 0%,
-    #00ffbb 20%,
-    #00ff88 40%,
-    #00cc6a 60%,
-    #00ff88 80%,
-    #00ffbb 100%
-  );
+  background: linear-gradient(180deg,
+      #00ff88 0%,
+      #00ffbb 20%,
+      #00ff88 40%,
+      #00cc6a 60%,
+      #00ff88 80%,
+      #00ffbb 100%);
   background-size: 100% 200%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -187,10 +184,7 @@
     chromeShine 3s linear infinite;
 
   /* Multi-layer glow shadow - reduced intensity */
-  filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.8))
-          drop-shadow(0 0 10px rgba(0, 255, 136, 0.6))
-          drop-shadow(0 0 20px rgba(0, 255, 136, 0.4))
-          drop-shadow(0 0 40px rgba(0, 255, 136, 0.2));
+  filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.8)) drop-shadow(0 0 10px rgba(0, 255, 136, 0.6)) drop-shadow(0 0 20px rgba(0, 255, 136, 0.4)) drop-shadow(0 0 40px rgba(0, 255, 136, 0.2));
 }
 
 /* Scanline overlay on title */
@@ -201,13 +195,11 @@
   left: -10%;
   width: 120%;
   height: 100%;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    transparent 2px,
-    rgba(0, 255, 136, 0.1) 2px,
-    rgba(0, 255, 136, 0.1) 4px
-  );
+  background: repeating-linear-gradient(0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 255, 136, 0.1) 2px,
+      rgba(0, 255, 136, 0.1) 4px);
   pointer-events: none;
   animation: scanlineScroll 8s linear infinite;
   z-index: 3;
@@ -218,6 +210,7 @@
   0% {
     background-position: 0% 0%;
   }
+
   100% {
     background-position: 0% 200%;
   }
@@ -229,9 +222,11 @@
     transform: translateY(0%);
     opacity: 0.3;
   }
+
   50% {
     opacity: 0.6;
   }
+
   100% {
     transform: translateY(100%);
     opacity: 0.3;
@@ -240,23 +235,16 @@
 
 /* Logo pulsing glow animation */
 @keyframes logoGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     filter:
-      drop-shadow(0 0 10px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 20px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 30px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 40px rgba(0, 255, 136, 0.8))
-      drop-shadow(0 0 70px rgba(0, 255, 136, 0.6))
-      drop-shadow(0 0 100px rgba(0, 255, 136, 0.4));
+      drop-shadow(0 0 10px rgba(0, 255, 136, 1)) drop-shadow(0 0 20px rgba(0, 255, 136, 1)) drop-shadow(0 0 30px rgba(0, 255, 136, 1)) drop-shadow(0 0 40px rgba(0, 255, 136, 0.8)) drop-shadow(0 0 70px rgba(0, 255, 136, 0.6)) drop-shadow(0 0 100px rgba(0, 255, 136, 0.4));
   }
+
   50% {
     filter:
-      drop-shadow(0 0 15px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 30px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 45px rgba(0, 255, 136, 1))
-      drop-shadow(0 0 60px rgba(0, 255, 136, 0.9))
-      drop-shadow(0 0 100px rgba(0, 255, 136, 0.7))
-      drop-shadow(0 0 150px rgba(0, 255, 136, 0.5));
+      drop-shadow(0 0 15px rgba(0, 255, 136, 1)) drop-shadow(0 0 30px rgba(0, 255, 136, 1)) drop-shadow(0 0 45px rgba(0, 255, 136, 1)) drop-shadow(0 0 60px rgba(0, 255, 136, 0.9)) drop-shadow(0 0 100px rgba(0, 255, 136, 0.7)) drop-shadow(0 0 150px rgba(0, 255, 136, 0.5));
   }
 }
 
@@ -328,13 +316,16 @@
 
 /* Breathing glow animation for START button */
 @keyframes buttonBreathingGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 0 20px rgba(0, 255, 136, 0.8),
       0 0 40px rgba(0, 255, 136, 0.5),
       0 0 60px rgba(0, 255, 136, 0.3);
     transform: scale(1);
   }
+
   50% {
     box-shadow:
       0 0 40px rgba(0, 255, 136, 1),
@@ -352,11 +343,13 @@
     opacity: 0.6;
     border-width: 2px;
   }
+
   50% {
     transform: scale(1.15);
     opacity: 0;
     border-width: 1px;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
@@ -468,8 +461,11 @@
 
 /* Individual track card */
 .track-card {
-  background: rgba(0, 0, 0, 0.5);
-  border: 3px solid var(--color-primary);
+  background: rgba(20, 20, 20, 0.4);
+  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  border-top: 4px solid var(--color-primary);
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   cursor: pointer;
@@ -480,7 +476,7 @@
   display: flex;
   flex-direction: column;
   box-shadow:
-    0 0 15px rgba(0, 255, 136, 0.2),
+    0 10px 40px rgba(0, 0, 0, 0.4),
     inset 0 0 20px rgba(0, 255, 136, 0.05);
 }
 
@@ -976,7 +972,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: transparent; /* Changed from #000000 to show 3D car */
+  background: transparent;
+  /* Changed from #000000 to show 3D car */
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -1124,10 +1121,12 @@
     opacity: 0;
     transform: scale(0) rotate(-180deg);
   }
+
   60% {
     opacity: 1;
     transform: scale(1.2) rotate(10deg);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) rotate(0deg);
@@ -1136,7 +1135,9 @@
 
 /* Gold star pulse (3-star only) */
 @keyframes goldGlowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     text-shadow:
       0 0 10px rgba(255, 200, 0, 1),
       0 0 20px rgba(255, 200, 0, 0.8),
@@ -1144,6 +1145,7 @@
       0 0 40px rgba(255, 200, 0, 0.4);
     transform: scale(1);
   }
+
   50% {
     text-shadow:
       0 0 20px rgba(255, 200, 0, 1),
@@ -1156,7 +1158,9 @@
 
 /* Victory glow pulse */
 @keyframes victoryGlowPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     text-shadow:
       0 0 10px rgba(0, 255, 136, 1),
       0 0 20px rgba(0, 255, 136, 1),
@@ -1165,6 +1169,7 @@
       0 0 70px rgba(0, 255, 136, 0.4),
       0 0 100px rgba(0, 255, 136, 0.2);
   }
+
   50% {
     text-shadow:
       0 0 15px rgba(0, 255, 136, 1),
@@ -1181,6 +1186,7 @@
   0% {
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
   }
+
   50% {
     box-shadow:
       0 0 40px rgba(0, 255, 136, 0.6),
@@ -1188,6 +1194,7 @@
       inset 0 0 40px rgba(0, 255, 136, 0.3);
     border-color: #00ffaa;
   }
+
   100% {
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
   }
@@ -1199,12 +1206,14 @@
     box-shadow: 0 0 20px rgba(255, 107, 107, 0);
     border-color: var(--color-primary);
   }
+
   50% {
     box-shadow:
       0 0 30px rgba(255, 107, 107, 0.5),
       inset 0 0 30px rgba(255, 107, 107, 0.2);
     border-color: #ff6b6b;
   }
+
   100% {
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
     border-color: var(--color-primary);
@@ -1213,13 +1222,24 @@
 
 /* Defeat shake animation */
 @keyframes defeatShake {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0);
   }
-  10%, 30%, 50%, 70%, 90% {
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
     transform: translateX(-5px);
   }
-  20%, 40%, 60%, 80% {
+
+  20%,
+  40%,
+  60%,
+  80% {
     transform: translateX(5px);
   }
 }
@@ -1230,6 +1250,7 @@
     opacity: 0;
     transform: translateY(-20px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -1473,6 +1494,7 @@
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1480,11 +1502,14 @@
 }
 
 @keyframes unlockPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 0 20px rgba(255, 0, 170, 0.3),
       inset 0 0 30px rgba(255, 0, 170, 0.1);
   }
+
   50% {
     box-shadow:
       0 0 30px rgba(255, 0, 170, 0.5),
@@ -1606,6 +1631,7 @@
    =========================== */
 
 @media (prefers-reduced-motion: reduce) {
+
   #main-menu h1,
   #main-menu .menu-button,
   #pause-menu h2,
@@ -1963,6 +1989,7 @@
     filter: blur(0px) brightness(1);
     transform: scale(1);
   }
+
   100% {
     opacity: 0;
     filter: blur(10px) brightness(0.5);
@@ -1976,6 +2003,7 @@
     filter: blur(10px) brightness(0.5);
     transform: scale(1.05);
   }
+
   100% {
     opacity: 1;
     filter: blur(0px) brightness(1);
@@ -1985,22 +2013,29 @@
 
 /* Glitch effect for occasional logo flair */
 @keyframes glitchEffect {
-  0%, 90%, 100% {
+
+  0%,
+  90%,
+  100% {
     transform: translate(0, 0);
     text-shadow: none;
   }
+
   20% {
     transform: translate(-2px, 2px);
     text-shadow: 2px -2px 0 #ff00ff, -2px 2px 0 #00ffff;
   }
+
   40% {
     transform: translate(2px, -2px);
     text-shadow: -2px 2px 0 #ff00ff, 2px -2px 0 #00ffff;
   }
+
   60% {
     transform: translate(-1px, 1px);
     text-shadow: 1px -1px 0 #ff00ff, -1px 1px 0 #00ffff;
   }
+
   80% {
     transform: translate(1px, -1px);
     text-shadow: -1px 1px 0 #ff00ff, 1px -1px 0 #00ffff;
@@ -2031,7 +2066,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: transparent; /* Changed from #000000 to show 3D car */
+  background: transparent;
+  /* Changed from #000000 to show 3D car */
   pointer-events: all;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
@@ -2045,19 +2081,18 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    135deg,
-    #000000 0%,
-    #001a0f 20%,
-    #000a14 40%,
-    #0a0014 60%,
-    #001a0f 80%,
-    #000000 100%
-  );
+  background: linear-gradient(135deg,
+      #000000 0%,
+      #001a0f 20%,
+      #000a14 40%,
+      #0a0014 60%,
+      #001a0f 80%,
+      #000000 100%);
   background-size: 400% 400%;
   pointer-events: none;
   animation: gradientShift 20s ease-in-out infinite;
-  opacity: 0.15; /* Reduced from 0.6 to match main menu */
+  opacity: 0.15;
+  /* Reduced from 0.6 to match main menu */
   z-index: 1;
 }
 
@@ -2069,13 +2104,11 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 255, 136, 0.03) 0px,
-    rgba(0, 255, 136, 0.03) 1px,
-    transparent 1px,
-    transparent 2px
-  );
+  background: repeating-linear-gradient(0deg,
+      rgba(0, 255, 136, 0.03) 0px,
+      rgba(0, 255, 136, 0.03) 1px,
+      transparent 1px,
+      transparent 2px);
   pointer-events: none;
   z-index: 10;
   opacity: 0.5;
@@ -2160,13 +2193,16 @@
 
 /* Blinking animation */
 @keyframes coinBlink {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     text-shadow:
       0 0 10px rgba(0, 255, 136, 0.8),
       0 0 20px rgba(0, 255, 136, 0.6),
       0 0 30px rgba(0, 255, 136, 0.4);
   }
+
   50% {
     opacity: 0.3;
     text-shadow:
@@ -2301,10 +2337,12 @@
   0% {
     background: transparent;
   }
+
   30% {
     background: rgba(0, 255, 136, 0.15);
     box-shadow: inset 0 0 100px rgba(0, 255, 136, 0.3);
   }
+
   100% {
     background: transparent;
   }

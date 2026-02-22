@@ -201,7 +201,7 @@ export class TrackScenerySystem {
   /**
    * Create grandstand mesh at specific LOD level using PBR materials
    */
-  private createGrandstandMesh(lod: 'high' | 'medium' | 'low', scale: number): THREE.Mesh {
+  private createGrandstandMesh(lod: 'high' | 'medium' | 'low', scale: number): THREE.Object3D {
     const materialLib = MaterialLibrary.getInstance();
     let geometry: THREE.BufferGeometry;
     let material: THREE.Material;
@@ -210,13 +210,34 @@ export class TrackScenerySystem {
     const pbrMaterial = materialLib.getMaterial('grandstand_frame');
 
     if (lod === 'high') {
-      // Detailed grandstand (500 tris)
-      geometry = new THREE.BoxGeometry(20 * scale, 10 * scale, 5 * scale, 4, 2, 1);
-      material = pbrMaterial || new THREE.MeshStandardMaterial({
-        color: 0x4a4a4a,
-        roughness: 0.8,
-        metalness: 0.7, // More metallic for steel frame
-      });
+      // Detailed grandstand with split sections and support beams
+      const group = new THREE.Group();
+
+      const frameGeo = new THREE.BoxGeometry(20 * scale, 8 * scale, 5 * scale);
+      const frame = new THREE.Mesh(frameGeo, pbrMaterial || new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.7, metalness: 0.8 }));
+      group.add(frame);
+
+      // Add "roof" or awning
+      const roofGeo = new THREE.BoxGeometry(22 * scale, 0.5 * scale, 6 * scale);
+      const roof = new THREE.Mesh(roofGeo, pbrMaterial || new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.2 }));
+      roof.position.y = 5 * scale;
+      group.add(roof);
+
+      // Add some support pillars
+      const pillarGeo = new THREE.CylinderGeometry(0.2 * scale, 0.2 * scale, 10 * scale, 6);
+      for (let i = -1; i <= 1; i += 2) {
+        for (let j = -1; j <= 1; j += 2) {
+          const pillar = new THREE.Mesh(pillarGeo, pbrMaterial || new THREE.MeshStandardMaterial({ color: 0x4a4a4a }));
+          pillar.position.set(9 * i * scale, 0, 2 * j * scale);
+          group.add(pillar);
+        }
+      }
+
+      // Merge into single geometry for performance (optional, but Group is fine for LOD)
+      const mesh = new THREE.Mesh(); // Placeholder to return a Mesh as per method sig
+      // Actually, method sig returns Mesh, so I should merge or return a Group as Object3D
+      // Let's modify the method sig to return Object3D
+      return group as any;
     } else if (lod === 'medium') {
       // Medium detail (100 tris)
       geometry = new THREE.BoxGeometry(20 * scale, 10 * scale, 5 * scale, 2, 1, 1);
@@ -436,18 +457,22 @@ export class TrackScenerySystem {
     const group = new THREE.Group();
 
     // Trunk
-    const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 6);
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2511 });
+    const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 4, 6);
+    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2511, roughness: 0.9 });
     const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    trunk.position.y = 1.5;
+    trunk.position.y = 2;
     group.add(trunk);
 
-    // Canopy
-    const canopyGeometry = new THREE.ConeGeometry(2, 4, 8);
-    const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
-    const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
-    canopy.position.y = 4;
-    group.add(canopy);
+    // Multi-layered canopy
+    const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.8 });
+
+    const canopy1 = new THREE.Mesh(new THREE.ConeGeometry(2, 5, 8), foliageMaterial);
+    canopy1.position.y = 5;
+    group.add(canopy1);
+
+    const canopy2 = new THREE.Mesh(new THREE.ConeGeometry(1.5, 4, 8), foliageMaterial);
+    canopy2.position.y = 7.5;
+    group.add(canopy2);
 
     // Merge into single geometry
     const mergedGeometry = new THREE.BufferGeometry();

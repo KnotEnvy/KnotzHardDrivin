@@ -173,9 +173,9 @@ export class PostProcessingSystem {
         this.height,
         this.settings.ssaoSamples // kernelSize parameter
       );
-      this.ssaoPass.kernelRadius = 0.5; // Small radius for contact shadows
-      this.ssaoPass.minDistance = 0.001;
-      this.ssaoPass.maxDistance = 0.1;
+      this.ssaoPass.kernelRadius = 0.8; // Larger radius for more visible occlusion
+      this.ssaoPass.minDistance = 0.005;
+      this.ssaoPass.maxDistance = 0.2;
       this.composer.addPass(this.ssaoPass);
       console.log(`[PostProcessingSystem] SSAO enabled (${this.settings.ssaoSamples} samples, ~${this.settings.ssaoSamples <= 16 ? '1.5' : '2.0'}ms)`);
     }
@@ -185,8 +185,8 @@ export class PostProcessingSystem {
       this.bloomPass = new UnrealBloomPass(
         new THREE.Vector2(this.width, this.height),
         this.settings.bloomStrength, // Strength
-        0.4, // Radius
-        0.85 // Threshold (only bright areas glow)
+        0.5, // Increased Radius for softer glow
+        0.75 // Lowered Threshold (more areas glow slightly)
       );
       this.composer.addPass(this.bloomPass);
       console.log(`[PostProcessingSystem] Bloom enabled (strength: ${this.settings.bloomStrength}, ~0.8ms)`);

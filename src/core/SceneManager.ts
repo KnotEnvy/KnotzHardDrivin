@@ -27,11 +27,6 @@ export class SceneManager {
   public camera: THREE.PerspectiveCamera;
   public renderer: THREE.WebGLRenderer;
 
-  // Lighting components
-  private sunLight!: THREE.DirectionalLight;
-  private hemisphereLight!: THREE.HemisphereLight;
-  private ambientLight!: THREE.AmbientLight;
-
   // Environment system
   private environmentSystem!: EnvironmentSystem;
   private environmentInitialized: boolean = false;
@@ -76,7 +71,6 @@ export class SceneManager {
     });
 
     this.setupRenderer(qualitySettings?.shadowMapSize ?? 2048);
-    this.setupLighting();
     this.createTestScene();
 
     // Initialize PBR Material Library
@@ -87,8 +81,8 @@ export class SceneManager {
     // Initialize environment system asynchronously
     const envQuality = qualitySettings?.environmentQuality ?? 'medium';
     const envSettings = envQuality === 'low' ? ENVIRONMENT_QUALITY_PRESETS.LOW :
-                       envQuality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
-                       ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
+      envQuality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
+        ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
 
     this.environmentSystem = new EnvironmentSystem(this.scene, this.camera, envSettings);
     this.initializeEnvironment();
@@ -132,56 +126,8 @@ export class SceneManager {
 
   /**
    * Set up comprehensive lighting rig
-   *
-   * Lighting strategy:
-   * 1. Directional light (sun): Primary light source with shadows
-   * 2. Hemisphere light: Realistic sky-ground color gradient
-   * 3. Ambient light: Subtle fill light to prevent pure black shadows
-   *
-   * Performance: ~0.3ms total for all lights
+   * Note: Fully delegated to SkyboxSystem now.
    */
-  private setupLighting(): void {
-    // 1. Directional Light (Sun) - Primary light with shadows
-    this.sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    this.sunLight.position.set(50, 100, 50); // High and angled
-    this.sunLight.castShadow = true;
-
-    // Configure shadow camera for optimal coverage
-    const shadowCameraSize = 100;
-    this.sunLight.shadow.camera.left = -shadowCameraSize;
-    this.sunLight.shadow.camera.right = shadowCameraSize;
-    this.sunLight.shadow.camera.top = shadowCameraSize;
-    this.sunLight.shadow.camera.bottom = -shadowCameraSize;
-    this.sunLight.shadow.camera.near = 0.5;
-    this.sunLight.shadow.camera.far = 500;
-
-    // Shadow map resolution (will be set by quality settings)
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
-
-    // Shadow bias to prevent shadow acne
-    this.sunLight.shadow.bias = -0.0001;
-
-    this.scene.add(this.sunLight);
-
-    // Add visual helper for sun light direction (debug only, remove in production)
-    // const sunHelper = new THREE.DirectionalLightHelper(this.sunLight, 5);
-    // this.scene.add(sunHelper);
-
-    // 2. Hemisphere Light (Sky) - Realistic ambient lighting from sky/ground
-    // Sky color: Light blue, Ground color: Darker earth tone
-    this.hemisphereLight = new THREE.HemisphereLight(
-      0x87ceeb, // Sky color (light blue)
-      0x3d2817, // Ground color (brown)
-      0.6 // Intensity
-    );
-    this.hemisphereLight.position.set(0, 50, 0);
-    this.scene.add(this.hemisphereLight);
-
-    // 3. Ambient Light (Fill) - Subtle fill to prevent pure black shadows
-    this.ambientLight = new THREE.AmbientLight(0x404040, 0.3);
-    this.scene.add(this.ambientLight);
-  }
 
   /**
    * Initialize environment system (ground, sky, clouds, scenery)
@@ -326,20 +272,9 @@ export class SceneManager {
     this.onResizeCallback = undefined;
   }
 
-  /**
-   * Update shadow map resolution based on quality settings
-   */
   setShadowMapSize(size: number): void {
     // Delegate to skybox system for shadow management
     this.skyboxSystem.setShadowMapSize(size);
-
-    // Also update legacy sun light if it exists
-    if (this.sunLight) {
-      this.sunLight.shadow.mapSize.width = size;
-      this.sunLight.shadow.mapSize.height = size;
-      this.sunLight.shadow.map?.dispose();
-      this.sunLight.shadow.map = null;
-    }
   }
 
   /**
@@ -356,8 +291,8 @@ export class SceneManager {
    */
   async setEnvironmentQuality(quality: 'low' | 'medium' | 'high'): Promise<void> {
     const settings = quality === 'low' ? ENVIRONMENT_QUALITY_PRESETS.LOW :
-                    quality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
-                    ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
+      quality === 'high' ? ENVIRONMENT_QUALITY_PRESETS.HIGH :
+        ENVIRONMENT_QUALITY_PRESETS.MEDIUM;
 
     if (this.environmentInitialized) {
       await this.environmentSystem.setQualitySettings(settings);
@@ -433,12 +368,6 @@ export class SceneManager {
 
     // Dispose of renderer
     this.renderer.dispose();
-
-    // Dispose of shadow maps
-    if (this.sunLight.shadow.map) {
-      this.sunLight.shadow.map.dispose();
-      this.sunLight.shadow.map = null;
-    }
 
     // Dispose of test scene geometries and materials
     if (this.testCube) {

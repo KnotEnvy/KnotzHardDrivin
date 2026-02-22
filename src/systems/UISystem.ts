@@ -81,7 +81,7 @@ export class UISystem {
   /**
    * Private constructor (singleton)
    */
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Gets or creates singleton instance
@@ -645,8 +645,33 @@ export class UISystem {
 
     if (data.damage !== undefined && this.damageIndicator) {
       const damagePercent = Math.min(100, data.damage * 100);
+      const prevWidth = parseFloat(this.damageIndicator.style.width || '0');
       this.damageIndicator.style.width = `${damagePercent}%`;
+
+      // Hit flash effect if damage increased
+      if (damagePercent > prevWidth + 1) {
+        this.triggerHitFlash();
+      }
     }
+  }
+
+  /**
+   * Triggers a visual flash and shake when taking damage
+   */
+  private triggerHitFlash(): void {
+    if (!this.hud) return;
+
+    // Flash the HUD red
+    this.hud.classList.add('hud-hit-flash');
+    setTimeout(() => {
+      this.hud?.classList.remove('hud-hit-flash');
+    }, 200);
+
+    // Camera shake (handled via CSS class on the main container)
+    this.container?.classList.add('camera-shake-intensity-med');
+    setTimeout(() => {
+      this.container?.classList.remove('camera-shake-intensity-med');
+    }, 400);
   }
 
   /**
@@ -1210,7 +1235,7 @@ export function enhanceUIWithAnimations(ui: UISystem): void {
   const originalShowPanel = ui.showPanel.bind(ui);
   ui.showPanel = function (panel: UIPanel) {
     originalShowPanel(panel);
-    
+
     // Apply animations based on panel type
     const panelElement = document.getElementById(panel.toString());
     if (panelElement) {

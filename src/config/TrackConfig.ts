@@ -19,6 +19,15 @@ export interface TrackMetadata {
  * Maps track IDs to their display information
  */
 export const TRACK_METADATA: Record<string, TrackMetadata> = {
+  oval: {
+    id: 'oval',
+    name: 'Super Speedway Oval',
+    description: 'A massive high-speed oval circuit with 15-degree banked turns. Designed for absolute top speeds.',
+    difficulty: 'easy',
+    length: '2.0 km',
+    turns: 2,
+    icon: '🏁',
+  },
   track01: {
     id: 'track01',
     name: 'Thunder Speedway Oval',

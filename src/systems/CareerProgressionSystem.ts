@@ -83,12 +83,28 @@ export class CareerProgressionSystem {
   private readonly TRACK_REGISTRY: TrackMetadata[] = [
     // === DIFFICULTY 1: BEGINNER TRACKS ===
     {
+      id: 'oval',
+      name: 'Super Speedway Oval',
+      description: 'A massive high-speed oval circuit with 15-degree banked turns. Designed for absolute top speeds and learning the basics of handling.',
+      difficulty: 1,
+      path: '/assets/tracks/oval.json',
+      unlocked: true,
+      starThresholds: {
+        bronze: 120000,
+        silver: 90000,
+        gold: 75000,
+      },
+    },
+
+    // === DIFFICULTY 2: EASY-MEDIUM TRACKS ===
+    {
       id: 'track01',
-      name: 'Thunder Speedway Oval',
-      description: 'A classic oval track perfect for learning the basics. Wide roads, gentle curves, and no obstacles.',
+      name: 'Thunder Speedway Short Oval',
+      description: 'A classic short oval track perfect for practicing your turning radius.',
       difficulty: 1,
       path: '/assets/tracks/track01.json',
-      unlocked: true, // First track always unlocked
+      unlocked: false,
+      unlockRequirement: 'oval',
       starThresholds: {
         bronze: 180000,  // 3:00.000 - Easy to achieve for first track
         silver: 120000,  // 2:00.000 - Moderate challenge
@@ -598,9 +614,9 @@ export class CareerProgressionSystem {
   private createNewProgress(): CareerProgress {
     return {
       version: this.SAVE_VERSION,
-      unlockedTracks: ['track01'], // First track always unlocked
+      unlockedTracks: ['oval'], // First track always unlocked
       completedTracks: new Map(),
-      currentTrack: 'track01',
+      currentTrack: 'oval',
       totalRaces: 0,
       totalCrashes: 0,
       totalPlayTime: 0,
