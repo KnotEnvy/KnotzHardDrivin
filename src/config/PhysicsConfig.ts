@@ -50,14 +50,24 @@ export const PHYSICS_CONSTANTS = {
   /**
    * Velocity damping to prevent jitter (0-1).
    * Applied to linear velocity each frame.
+   *
+   * Raised from 0.01 → 0.05 after the surface-normal fix (Phase 1).
+   * Real contact normals on trimesh tracks have per-facet variation; a slightly
+   * higher linear damping absorbs the residual micro-oscillations that were
+   * previously invisible when the normal was locked to world-up.
    */
-  LINEAR_DAMPING: 0.01,
+  LINEAR_DAMPING: 0.05,
 
   /**
    * Angular damping to prevent spinning (0-1).
    * Applied to angular velocity each frame.
+   *
+   * Raised from 0.15 → 0.25 after the surface-normal fix (Phase 1).
+   * On banked surfaces suspension forces now have horizontal components that
+   * can generate small torques from asymmetric facet normals; extra angular
+   * damping keeps the chassis stable without affecting steering feel.
    */
-  ANGULAR_DAMPING: 0.15,
+  ANGULAR_DAMPING: 0.25,
 
   /**
    * Minimum velocity threshold for sleep (m/s).

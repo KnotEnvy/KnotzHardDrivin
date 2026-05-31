@@ -1,9 +1,18 @@
 # Hard Drivin' Remake - Alpha 1.1.0
 
-**Status**: Alpha - Visual Enhancement Complete, Beta Prep Phase
+**Status**: Alpha — Track + Physics Foundation Revival (in progress)
 **Version**: 1.1.0
-**Last Updated**: November 9, 2025
+**Last Updated**: May 30, 2026
 **Stack**: TypeScript + Three.js + Rapier.js + Vite + Howler.js
+
+> **Revival note (May 2026):** The project was paused because banked/ramped/loop
+> tracks were undrivable. Root cause identified: (1) wheel raycasts ignored the
+> real surface normal (`Vehicle.ts` used a hardcoded world-up), and (2) track
+> spline generation force-closed the curve and flattened elevation/pitch. We are
+> repairing the physics↔track seam (see `__DOCS__`/plan) rather than rewriting —
+> the ~25k-line engine (physics, replay, camera, UI, FSM) is sound. Audio and
+> `.glb` model assets are intentionally absent (audio = TODO; vehicles are
+> procedurally generated in code).
 
 ---
 
@@ -43,7 +52,7 @@ npm run dev          # Opens http://localhost:4200
 - **Replay System**: 60Hz recording, smooth interpolation, auto-playback
 - **Timer System**: Lap tracking, race timer, checkpoint system
 - **Leaderboard**: Top 10 persistent scores with ghost data
-- **Audio System**: Engine sounds (RPM-based), spatial audio, volume controls
+- **Audio System**: Code complete (RPM engine, spatial audio, volume) — ⚠️ NO sound assets yet (`assets/audio/` empty; silent until placeholder audio is added in Phase 5)
 - **UI/HUD**: Main menu, car selection, in-game HUD, pause menu, results screen, settings screen, leaderboard screen
 - **Visual Enhancement**: 3D menu backgrounds, attract mode, animated gradients, chrome effects, CRT post-processing
 - **Menu System**: Attract screen, keyboard navigation, smooth transitions, 3D rotating car showcase
@@ -52,7 +61,7 @@ npm run dev          # Opens http://localhost:4200
 - **Frame Rate**: 77+ fps average (200+ fps peak)
 - **Frame Time**: ~4-5ms (~12ms budget remaining)
 - **Memory**: 20-70MB stable
-- **Tests**: 1156 passing (95.9%)
+- **Tests**: 1152 passing / 1267 total (~91%); 112 failures concentrated in `UISystem.test.ts` (jsdom DOM assertions), not engine logic
 
 ---
 

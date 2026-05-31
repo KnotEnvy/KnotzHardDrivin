@@ -306,6 +306,29 @@ class MockRapierWorld {
     delete (this as any)._raycastResults;
   }
 
+  castRayAndGetNormal(
+    ray: any,
+    maxToi: number,
+    solid: boolean,
+    filterFlags?: any,
+    filterGroups?: any,
+    filterExcludeCollider?: any,
+    filterExcludeRigidBody?: any,
+    filterPredicate?: any
+  ): any | null {
+    // Mirrors castRay but also returns a normal field.
+    // Default: flat ground — normal pointing straight up.
+    if ((this as any)._raycastResults) {
+      const result = (this as any)._raycastResults.shift();
+      return result !== undefined ? result : null;
+    }
+    return {
+      timeOfImpact: 0.3,
+      normal: { x: 0, y: 1, z: 0 },
+      collider: this.getCollider(0),
+    };
+  }
+
   castShape(
     shapePos: any,
     shapeRot: any,

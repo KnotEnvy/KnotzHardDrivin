@@ -218,9 +218,14 @@ export class Vehicle {
   async init(position: Vector3, rotation: Quaternion, scene: THREE.Scene): Promise<void> {
     this.scene = scene;
 
+    // Offset the authored (surface) spawn up to chassis ride height so the wheels
+    // hang onto the road instead of the chassis spawning embedded in it. See
+    // computeRideHeightSpawn().
+    const spawn = this.computeRideHeightSpawn(position, rotation);
+
     // Create rigid body description
     const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(position.x, position.y, position.z)
+      .setTranslation(spawn.x, spawn.y, spawn.z)
       .setRotation({
         x: rotation.x,
         y: rotation.y,
@@ -482,11 +487,38 @@ export class Vehicle {
    * @param position - New world position
    * @param rotation - New world rotation
    */
+  /**
+   * Converts an authored road-SURFACE spawn point into the chassis-origin spawn
+   * position by offsetting upward (along the spawn's own up vector) by the resting
+   * ride height: suspension rest length + the wheel mount drop + a small settle
+   * margin. This keeps the wheels hanging onto the surface instead of the chassis
+   * spawning embedded in the road (which ejects the car and leaves it ungrounded).
+   * Works for flat, banked, and inverted spawns because the offset follows the
+   * rotated up axis.
+   *
+   * @param position - Authored surface spawn position
+   * @param rotation - Spawn rotation
+   * @returns Chassis-origin spawn position (new Vector3)
+   */
+  private computeRideHeightSpawn(position: Vector3, rotation: Quaternion): Vector3 {
+    const restLen = this.config.wheels[0].suspensionRestLength;
+    const mountDrop = Math.abs(this.config.wheels[0].position.y);
+    const rideHeight = restLen + mountDrop + 0.1;
+    const up = new Vector3(0, 1, 0).applyQuaternion(rotation);
+    return new Vector3(
+      position.x + up.x * rideHeight,
+      position.y + up.y * rideHeight,
+      position.z + up.z * rideHeight
+    );
+  }
+
   reset(position: Vector3, rotation: Quaternion): void {
     if (!this.initialized) return;
 
-    // Set new transform
-    this.rigidBody.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+    // Set new transform (apply the same ride-height offset as init so respawns
+    // don't drop the chassis back into the road surface).
+    const spawn = this.computeRideHeightSpawn(position, rotation);
+    this.rigidBody.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true);
     this.rigidBody.setRotation(
       { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w },
       true
@@ -812,9 +844,10 @@ export class Vehicle {
       this.temp.tempRay.origin = rayOrigin;
       this.temp.tempRay.dir = rayDirection;
 
-      // Perform raycast
+      // Perform raycast — use castRayAndGetNormal so we get the real surface normal
+      // instead of hardcoding world-up. This is critical for banks, ramps, and loops.
       const maxDist = wheelConfig.suspensionRestLength + wheelConfig.suspensionMaxTravel;
-      const hit = this.world.castRay(
+      const hit = this.world.castRayAndGetNormal(
         this.temp.tempRay,
         maxDist,
         true, // solid
@@ -832,7 +865,21 @@ export class Vehicle {
           rayOrigin.y + rayDir.y * hit.timeOfImpact,
           rayOrigin.z + rayDir.z * hit.timeOfImpact
         );
-        wheelState.contactNormal.set(0, 1, 0); // Default up (TODO: get from hit normal)
+        // Read the real surface normal from the hit result.
+        // Trimesh normals can point either face direction depending on winding order,
+        // so we guarantee the normal opposes the ray direction (pushes wheel away from surface).
+        wheelState.contactNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
+        // Guard against degenerate (zero-area) triangles returning a null/NaN normal:
+        // fall back to chassis-up so we never feed NaN into the suspension/grip math.
+        if (wheelState.contactNormal.lengthSq() < 0.5) {
+          wheelState.contactNormal.copy(this.cachedTransform.up);
+        } else {
+          wheelState.contactNormal.normalize();
+          if (wheelState.contactNormal.dot(rayDir) > 0) {
+            // Normal points same way as ray (into the surface) — flip it so suspension pushes out.
+            wheelState.contactNormal.negate();
+          }
+        }
         wheelState.surfaceType = SurfaceType.TARMAC; // TODO: detect from material
       } else {
         wheelState.isGrounded = false;
@@ -1345,8 +1392,27 @@ export class Vehicle {
   /**
    * Applies stability control to prevent vehicle from flipping over.
    * This adds a corrective torque when the vehicle tilts too much.
+   *
+   * LOOP SUPPRESSION (Phase 3): When all four wheels are airborne and the
+   * vehicle is moving faster than LOOP_FLIGHT_SPEED_THRESHOLD m/s, the
+   * corrective torque and roll damping are fully suppressed. This prevents
+   * stability control from fighting the vertical-loop geometry where the car
+   * is legitimately inverted at the apex. The threshold is above normal-jump
+   * airborne speed (~5 m/s launch) but well below loop entry speed (~30 m/s),
+   * so low-speed tumble correction (crashes/flips) is preserved.
    */
   private applyStabilityControl(deltaTime: number): void {
+    // --- Loop suppression guard ---
+    // Suppress all stability torques while the vehicle is fully airborne at
+    // high speed so the loop trimesh can guide it without fighting correction.
+    const LOOP_FLIGHT_SPEED_THRESHOLD = 8.0; // m/s — above jump, below loop entry
+    const wheelsOffGround = this.wheels.filter(w => !w.isGrounded).length;
+    const speed = this.cachedTransform.linearVelocity.length();
+    if (wheelsOffGround === 4 && speed > LOOP_FLIGHT_SPEED_THRESHOLD) {
+      // Car is in high-speed free flight (loop or fast jump) — let physics run free.
+      return;
+    }
+
     // Get vehicle's up vector
     const up = this.cachedTransform.up;
     const worldUp = this.temp.tempVec1.set(0, 1, 0);

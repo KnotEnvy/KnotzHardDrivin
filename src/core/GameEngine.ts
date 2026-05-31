@@ -1617,11 +1617,13 @@ export class GameEngine {
         console.log('✅ Shadow frustum updated for track bounds');
       }
 
-      // DEBUG: Add collision mesh visualization (shows physics geometry as green wireframe)
-      // This helps identify invisible walls and collision issues
-      console.log('[TRACK DEBUG] Enabling collision debug visualization...');
-      this.track.createCollisionDebugMesh(this.sceneManager.scene);
-      console.log('[TRACK DEBUG] Green wireframe shows physics collision mesh');
+      // DEBUG: Collision mesh visualization (green wireframe of physics geometry).
+      // Off by default; enable by appending ?debugCollision to the URL.
+      if (new URLSearchParams(window.location.search).has('debugCollision')) {
+        console.log('[TRACK DEBUG] Enabling collision debug visualization...');
+        this.track.createCollisionDebugMesh(this.sceneManager.scene);
+        console.log('[TRACK DEBUG] Green wireframe shows physics collision mesh');
+      }
 
       // Get spawn point from track
       const spawnPoint = this.track.getSpawnPoint();

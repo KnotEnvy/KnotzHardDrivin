@@ -72,26 +72,88 @@ export interface TrackData {
   background?: string; // Optional - distant background type ('desert', 'city', 'mountain', 'forest', 'none')
 }
 
+// ---------------------------------------------------------------------------
+// Frame-transport data structures
+// ---------------------------------------------------------------------------
+
+/**
+ * A single oriented frame control point along the track centerline.
+ *
+ * forward, up, right form an orthonormal basis (right = cross(forward, up)).
+ * banking stores the accumulated roll in radians so the mesh builder can
+ * retrieve it per-point without recomputing.
+ */
+export interface FramePoint {
+  /** World-space position of the centerline at this point. */
+  position: THREE.Vector3;
+  /** Unit tangent — direction of travel at this point. */
+  forward: THREE.Vector3;
+  /** Unit surface-normal of the track at this point (rolled by banking). */
+  up: THREE.Vector3;
+  /** Unit lateral axis: cross(forward, up). Pre-computed for the mesh builder. */
+  right: THREE.Vector3;
+  /** Accumulated banking angle in radians (positive = left-edge high). */
+  banking: number;
+}
+
+/**
+ * Running transport frame carried through section generators.
+ * Always orthonormal.
+ */
+interface TransportFrame {
+  position: THREE.Vector3;
+  forward: THREE.Vector3; // unit
+  up: THREE.Vector3;      // unit
+  right: THREE.Vector3;   // unit = cross(forward, up)
+}
+
+// ---------------------------------------------------------------------------
+/**
+ * Re-orthogonalises a transport frame in-place.
+ *
+ * Convention: right = cross(up, forward).
+ * For sections that keep right fixed (ramps), forward has already been updated.
+ * We keep forward canonical and re-derive up from forward and right, then
+ * re-derive right from up and forward to kill any accumulated drift.
+ *
+ * Call order matters: forward → up (cross(fwd,right)) → right (cross(up,fwd)).
+ */
+function reorthogonalise(frame: TransportFrame): void {
+  frame.forward.normalize();
+  // Re-derive up from forward and right (right is the rotation axis for ramps)
+  frame.up.crossVectors(frame.forward, frame.right).normalize();
+  // Re-derive right to kill drift: right = cross(up, forward)
+  frame.right.crossVectors(frame.up, frame.forward).normalize();
+}
+
 /**
  * Track entity - generates and manages track geometry, collision, and waypoints.
  *
- * Generates smooth track geometry from spline curves defined by sections.
- * Creates visual mesh and physics collision mesh.
+ * Uses a frame-transport approach: a running orthonormal frame {forward, up, right}
+ * is carried through each section generator. This correctly handles ramps
+ * (pitched forward/up about right), loops (full 360-degree pitch), and banked
+ * curves (turn in local-horizontal plane plus roll about forward). The stored
+ * per-point frame is then used directly in mesh generation so loops never
+ * produce the degenerate worldUp x tangent = 0 case that the old code suffered.
  *
  * Performance target: <5ms generation time, <2ms collision per frame
  */
 export class Track {
   private mesh!: THREE.Mesh;
   private collider: RAPIER.Collider | null = null;
-  private rigidBody: RAPIER.RigidBody | null = null; // Static rigid body for track
+  private wallCollider: RAPIER.Collider | null = null;       // Separate wall collider
+  private rigidBody: RAPIER.RigidBody | null = null;          // Static rigid body for road
+  private wallRigidBody: RAPIER.RigidBody | null = null;      // Static rigid body for walls
   private spline!: THREE.CatmullRomCurve3;
-  private controlPoints!: THREE.Vector3[]; // Control points used to generate the spline
+  private framePoints: FramePoint[] = [];  // Frame-transport control points
   private trackData: TrackData;
   private physicsWorld: PhysicsWorld; // Store reference for cleanup
   private scene: THREE.Scene; // Store reference for obstacle cleanup
   private obstacles: Obstacle[] = []; // Track obstacles
   private scenerySystem: TrackScenerySystem | null = null; // Track scenery system
   private backgroundSystem: BackgroundSystem | null = null; // Distant background system
+  /** Whether the track's end point was detected to close back to its start. */
+  private isClosed: boolean = false;
 
   // Temp objects to avoid per-frame allocations
   private tempVec1 = new THREE.Vector3();
@@ -107,7 +169,7 @@ export class Track {
    * @param camera - Camera for scenery LOD (optional)
    */
   constructor(data: TrackData, world: PhysicsWorld, scene: THREE.Scene, camera?: THREE.Camera) {
-    // Generate track geometry
+    // Generate track geometry via frame-transport
     this.generateSpline(data.sections);
     this.mesh = this.generateMesh(data.width);
     this.generateCollider(world);
@@ -146,44 +208,30 @@ export class Track {
     console.log(`Track "${this.trackData.name}" loaded: ${this.trackData.sections.length} sections, ${this.trackData.waypoints?.length || 0} waypoints, ${this.obstacles.length} obstacles`);
   }
 
+  // ---------------------------------------------------------------------------
+  // Background system helpers (unchanged from previous version)
+  // ---------------------------------------------------------------------------
+
   /**
    * Initialize background system based on track data
-   *
-   * @param backgroundType - Background type from track JSON
    */
   private async initializeBackground(backgroundType: string): Promise<void> {
     if (!this.backgroundSystem) return;
-
-    // Map background string to BackgroundType
     const bgType = this.parseBackgroundType(backgroundType);
-
-    // Configure based on track theme
     const config = this.getBackgroundConfig(bgType);
-
     await this.backgroundSystem.setBackground(bgType, config);
   }
 
-  /**
-   * Parse background type string from track JSON
-   */
   private parseBackgroundType(type: string): BackgroundType {
     switch (type.toLowerCase()) {
-      case 'desert':
-        return 'desert';
-      case 'city':
-        return 'city';
-      case 'mountain':
-        return 'mountain';
-      case 'forest':
-        return 'forest';
-      default:
-        return 'none';
+      case 'desert':   return 'desert';
+      case 'city':     return 'city';
+      case 'mountain': return 'mountain';
+      case 'forest':   return 'forest';
+      default:         return 'none';
     }
   }
 
-  /**
-   * Get background configuration based on type
-   */
   private getBackgroundConfig(type: BackgroundType): Partial<{
     distance: number;
     parallaxFactor: number;
@@ -191,46 +239,17 @@ export class Track {
     enableAtmosphericEffects: boolean;
   }> {
     switch (type) {
-      case 'desert':
-        return {
-          distance: 1200,
-          parallaxFactor: 0.25,
-          enableClouds: false,
-          enableAtmosphericEffects: true,
-        };
-      case 'city':
-        return {
-          distance: 800,
-          parallaxFactor: 0.35,
-          enableClouds: false,
-          enableAtmosphericEffects: false,
-        };
-      case 'mountain':
-        return {
-          distance: 1500,
-          parallaxFactor: 0.2,
-          enableClouds: true,
-          enableAtmosphericEffects: false,
-        };
-      case 'forest':
-        return {
-          distance: 1000,
-          parallaxFactor: 0.3,
-          enableClouds: true,
-          enableAtmosphericEffects: false,
-        };
-      default:
-        return {};
+      case 'desert':   return { distance: 1200, parallaxFactor: 0.25, enableClouds: false, enableAtmosphericEffects: true };
+      case 'city':     return { distance:  800, parallaxFactor: 0.35, enableClouds: false, enableAtmosphericEffects: false };
+      case 'mountain': return { distance: 1500, parallaxFactor: 0.20, enableClouds: true,  enableAtmosphericEffects: false };
+      case 'forest':   return { distance: 1000, parallaxFactor: 0.30, enableClouds: true,  enableAtmosphericEffects: false };
+      default:         return {};
     }
   }
 
   /**
-   * Update background system (parallax and clouds)
-   *
-   * Call this from game loop for animated backgrounds.
-   * Performance: <0.3ms per frame
-   *
-   * @param deltaTime - Time since last frame in seconds
+   * Update background system (parallax and clouds).
+   * Call from game loop for animated backgrounds. Performance: <0.3ms per frame.
    */
   updateBackground(deltaTime: number): void {
     if (this.backgroundSystem) {
@@ -238,426 +257,562 @@ export class Track {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Frame-transport spline generation
+  // ---------------------------------------------------------------------------
+
   /**
-   * Generates a Catmull-Rom spline from track sections.
+   * Generates the track centerline using frame transport.
    *
-   * Processes each section sequentially, generating control points
-   * that define the track's centerline path. Also tracks banking angles
-   * per control point for proper mesh generation.
+   * A running orthonormal frame {forward, up, right} is carried through every
+   * section. Each section emits FramePoint records that store both the 3-D
+   * position AND the complete orientation at that point. This makes the mesh
+   * builder section-type-agnostic: it simply reads the stored frame.
    *
-   * @param sections - Array of track section definitions
+   * After all sections are processed a closure check determines whether
+   * CatmullRomCurve3 should be created with closed=true.
+   *
+   * @param sections - Array of track section definitions (JSON schema unchanged)
    */
   private generateSpline(sections: TrackSection[]): void {
-    const points: THREE.Vector3[] = [];
-    const bankingAngles: number[] = [];
+    // Initial frame: start at Y=0.5 (avoids Z-fighting with ground), face +Z.
+    // Convention: right = cross(up, forward) = cross(Y, Z) = X (world right)
+    let frame: TransportFrame = {
+      position: new THREE.Vector3(0, 0.5, 0),
+      forward:  new THREE.Vector3(0, 0, 1),
+      up:       new THREE.Vector3(0, 1, 0),
+      right:    new THREE.Vector3(1, 0, 0), // cross(up,fwd) = cross(Y,Z) = X ✓
+    };
 
-    // FIX: Elevate track 0.5m above ground to prevent clipping (ground is at Y=0)
-    let currentPos = new THREE.Vector3(0, 0.5, 0);
-    let currentDir = new THREE.Vector3(0, 0, 1); // Start facing +Z
+    const allFramePoints: FramePoint[] = [];
 
     for (const section of sections) {
-      const result = this.generateSectionPoints(
-        section,
-        currentPos,
-        currentDir
-      );
+      const sectionPoints = this.generateSectionFramePoints(section, frame);
 
-      // Add all but the first point (to avoid duplicates)
-      if (points.length === 0) {
-        points.push(...result.points);
-        bankingAngles.push(...result.bankingAngles);
+      // Append: skip the duplicate start point on sections after the first
+      if (allFramePoints.length === 0) {
+        allFramePoints.push(...sectionPoints);
       } else {
-        points.push(...result.points.slice(1));
-        bankingAngles.push(...result.bankingAngles.slice(1));
+        allFramePoints.push(...sectionPoints.slice(1));
       }
 
-      // Update position and direction for next section
-      if (result.points.length > 1) {
-        currentPos = result.points[result.points.length - 1].clone();
-        currentDir = result.points[result.points.length - 1]
-          .clone()
-          .sub(result.points[result.points.length - 2])
-          .normalize();
-      } else if (result.points.length === 1) {
-        // Single point section - use that point but don't update direction
-        currentPos = result.points[0].clone();
-        console.warn(`Track section generated only 1 point - direction not updated`);
-      } else {
-        throw new Error(`Track section generated 0 points - invalid track configuration`);
+      // Advance the running frame to the end of this section
+      if (sectionPoints.length > 0) {
+        const last = sectionPoints[sectionPoints.length - 1];
+        frame = {
+          position: last.position.clone(),
+          forward:  last.forward.clone(),
+          up:       last.up.clone(),
+          right:    last.right.clone(),
+        };
       }
     }
 
-    // Store control points and banking data for later reference
-    this.controlPoints = points;
-    this.controlPointBanking = bankingAngles;
+    this.framePoints = allFramePoints;
 
-    // Create closed loop spline
-    this.spline = new THREE.CatmullRomCurve3(points, true);
-    console.log(`Spline generated with ${points.length} control points, ${bankingAngles.length} banking angles`);
+    // Detect closure: end ≈ start (within 1 m) AND headings aligned (dot > 0.99)
+    const CLOSURE_DIST_SQ = 1.0 * 1.0; // 1 metre squared
+    const CLOSURE_DOT     = 0.99;
+    const firstFP = allFramePoints[0];
+    const lastFP  = allFramePoints[allFramePoints.length - 1];
+    const distSq  = firstFP.position.distanceToSquared(lastFP.position);
+    const dot     = firstFP.forward.dot(lastFP.forward);
+    this.isClosed = distSq < CLOSURE_DIST_SQ && dot > CLOSURE_DOT;
+
+    // Build CatmullRomCurve3 from the centerline positions only
+    const splinePositions = allFramePoints.map(fp => fp.position.clone());
+    this.spline = new THREE.CatmullRomCurve3(splinePositions, this.isClosed);
+
+    console.log(
+      `Spline generated: ${allFramePoints.length} frame-points, ` +
+      `closed=${this.isClosed} (distSq=${distSq.toFixed(2)}, dot=${dot.toFixed(3)})`
+    );
   }
 
   /**
-   * Generates control points for a single track section.
+   * Generates FramePoint records for one track section.
+   *
+   * Each section type transforms the incoming transport frame and emits a
+   * sequence of FramePoints with C1-continuous tangent directions.
    *
    * @param section - Section configuration
-   * @param startPos - Starting position in world space
-   * @param startDir - Starting direction (unit vector)
-   * @returns Object containing points and banking angles for the section
+   * @param startFrame - Incoming transport frame (orthonormal)
+   * @returns Array of FramePoints including the start point
    */
-  private generateSectionPoints(
+  private generateSectionFramePoints(
     section: TrackSection,
-    startPos: THREE.Vector3,
-    startDir: THREE.Vector3
-  ): { points: THREE.Vector3[]; bankingAngles: number[] } {
-    const points: THREE.Vector3[] = [];
-    const bankingAngles: number[] = [];
+    startFrame: TransportFrame
+  ): FramePoint[] {
 
-    // Use appropriate divisions based on section type
-    // Straights need minimal points, curves need more for smoothness
-    let divisions: number;
-    switch (section.type) {
-      case 'straight':
-        divisions = 1; // Only start and end points for straight lines
-        break;
-      case 'curve':
-      case 'bank':
-        divisions = 20; // Smooth curves need more points
-        break;
-      case 'loop':
-        divisions = 30; // Loops need even more for smoothness
-        break;
-      case 'ramp':
-        divisions = 8; // Ramps need enough points for smooth elevation
-        break;
-      default:
-        divisions = 10;
-    }
+    const frameToPoint = (f: TransportFrame, banking: number): FramePoint => ({
+      position: f.position.clone(),
+      forward:  f.forward.clone(),
+      up:       f.up.clone(),
+      right:    f.right.clone(),
+      banking,
+    });
 
     switch (section.type) {
+
+      // ------------------------------------------------------------------
+      // STRAIGHT: step along current forward, frame unchanged
+      // ------------------------------------------------------------------
       case 'straight': {
-        const length = section.length || 50;
+        const length    = section.length || 50;
+        const divisions = Math.max(2, Math.round(length / 10)); // ~1 point per 10 m
+        const points: FramePoint[] = [];
+
+        // Clone to avoid mutating the caller's frame
+        const f: TransportFrame = {
+          position: startFrame.position.clone(),
+          forward:  startFrame.forward.clone(),
+          up:       startFrame.up.clone(),
+          right:    startFrame.right.clone(),
+        };
+
         for (let i = 0; i <= divisions; i++) {
-          const t = i / divisions;
-          const pos = startPos.clone().add(
-            startDir.clone().multiplyScalar(length * t)
-          );
-          points.push(pos);
-          bankingAngles.push(0); // No banking on straights
+          points.push(frameToPoint(f, 0));
+          if (i < divisions) {
+            const step = length / divisions;
+            f.position.addScaledVector(f.forward, step);
+          }
         }
-        break;
+        return points;
       }
 
+      // ------------------------------------------------------------------
+      // CURVE: rotate forward (and right) about the frame's UP axis.
+      // This means the turn follows the local-horizontal plane, so an
+      // incoming pitched frame will curve along a banked surface correctly.
+      // ------------------------------------------------------------------
       case 'curve': {
-        const radius = section.radius || 30;
-        const angle = ((section.angle || 90) * Math.PI) / 180; // Convert to radians
-        const isLeftTurn = angle > 0;
-
-        // Calculate curve center perpendicular to start direction
-        const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
-
-        // For positive angle, turn right (center is to the right)
-        // For negative angle, turn left (center is to the left)
-        const turnDirection = isLeftTurn ? -1 : 1;
-        const center = startPos.clone().add(right.multiplyScalar(radius * turnDirection));
-
-        // Calculate initial angle offset from center
-        const initialOffset = new THREE.Vector3().subVectors(startPos, center);
-        const initialAngle = Math.atan2(initialOffset.z, initialOffset.x);
-
-        for (let i = 0; i <= divisions; i++) {
-          const t = i / divisions;
-          const theta = initialAngle + angle * t;
-
-          // Calculate position on arc
-          const pos = new THREE.Vector3(
-            center.x + Math.cos(theta) * radius,
-            startPos.y, // Maintain elevation (for now - will be overridden by ramps)
-            center.z + Math.sin(theta) * radius
-          );
-
-          points.push(pos);
-          bankingAngles.push(0); // Regular curves have no banking (use 'bank' type for that)
-        }
-        break;
+        const radius    = section.radius || 30;
+        const angleDeg  = section.angle  || 90;
+        const angleRad  = (angleDeg * Math.PI) / 180;
+        const divisions = Math.max(20, Math.round(Math.abs(angleDeg) * 0.4));
+        return this.buildArcFramePoints(startFrame, radius, angleRad, divisions, 0);
       }
 
-      case 'ramp': {
-        const length = section.length || 30;
-        const height = section.height || 5;
-
-        for (let i = 0; i <= divisions; i++) {
-          const t = i / divisions;
-          // Smooth ease-in/ease-out curve for height transition
-          const heightCurve = t < 0.5
-            ? 2 * t * t // Ease in
-            : 1 - Math.pow(-2 * t + 2, 2) / 2; // Ease out
-
-          const pos = startPos.clone()
-            .add(startDir.clone().multiplyScalar(length * t))
-            .setY(startPos.y + height * heightCurve);
-
-          points.push(pos);
-          bankingAngles.push(0); // No banking on ramps
-        }
-        break;
-      }
-
-      case 'loop': {
-        const loopRadius = section.radius || 15;
-
-        // Full 360-degree vertical loop
-        // The loop is oriented perpendicular to the start direction
-        const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
-
-        for (let i = 0; i <= divisions; i++) {
-          const t = i / divisions;
-          const theta = Math.PI * 2 * t; // Full 360 degrees
-
-          // Calculate position on vertical loop
-          // Start at bottom, go around
-          const verticalOffset = loopRadius * (1 - Math.cos(theta));
-          const forwardOffset = loopRadius * Math.sin(theta);
-
-          const pos = startPos.clone()
-            .add(up.clone().multiplyScalar(verticalOffset))
-            .add(startDir.clone().multiplyScalar(forwardOffset));
-
-          points.push(pos);
-          bankingAngles.push(0); // Loops handle their own geometry
-        }
-        break;
-      }
-
+      // ------------------------------------------------------------------
+      // BANK: like CURVE but additionally rolls up/right about forward.
+      // Banking is eased in the first 25%, held through middle, eased out
+      // in the last 25% (preserving the original easing intent).
+      //
+      // Convention: positive angle = LEFT turn.
+      // For a left banked curve, the left edge should be higher (bank tilts
+      // the road surface toward the turn centre, which is to the left).
+      // The maxBanking sign: positive maxBanking tilts the road surface so
+      // the left edge (at -right) is higher → up vector tilts toward +right.
+      // ------------------------------------------------------------------
       case 'bank': {
-        // Banked curve - curve with progressive banking
-        const radius = section.radius || 40;
-        const angle = ((section.angle || 90) * Math.PI) / 180;
-        const maxBanking = ((section.banking || 15) * Math.PI) / 180;
-        const isLeftTurn = angle > 0;
+        const radius     = section.radius  || 40;
+        const angleDeg   = section.angle   || 90;
+        const angleRad   = (angleDeg * Math.PI) / 180;
+        const maxBankDeg = section.banking || 15;
+        const maxBankRad = (maxBankDeg * Math.PI) / 180;
+        const divisions  = Math.max(20, Math.round(Math.abs(angleDeg) * 0.4));
 
-        const up = new THREE.Vector3(0, 1, 0);
-        const right = new THREE.Vector3().crossVectors(startDir, up).normalize();
+        return this.buildArcFramePoints(
+          startFrame, radius, angleRad, divisions,
+          maxBankRad
+        );
+      }
 
-        const turnDirection = isLeftTurn ? -1 : 1;
-        const center = startPos.clone().add(right.multiplyScalar(radius * turnDirection));
+      // ------------------------------------------------------------------
+      // RAMP: pitch the frame forward/up about the RIGHT axis.
+      // Uses a sine-eased height profile for C1 continuity at entry/exit.
+      // The pitch is derived from the slope at each step, so the forward
+      // vector always points along the ramp surface and carries correctly
+      // into the next section.
+      // ------------------------------------------------------------------
+      case 'ramp': {
+        const length    = section.length || 30;
+        const height    = section.height || 5;
+        const divisions = Math.max(8, Math.round(length / 5));
+        const points: FramePoint[] = [];
 
-        // Calculate initial angle offset
-        const initialOffset = new THREE.Vector3().subVectors(startPos, center);
-        const initialAngle = Math.atan2(initialOffset.z, initialOffset.x);
+        // The ramp is traced in the local forward/up plane.
+        // We compute the height at each parameter using a smooth sine curve:
+        //   h(t) = height * 0.5 * (1 - cos(π * t))
+        // This gives h(0)=0, h(1)=height with zero first-derivative at both
+        // ends — matching whatever pitch the incoming frame has.
 
-        for (let i = 0; i <= divisions; i++) {
-          const t = i / divisions;
-          const theta = initialAngle + angle * t;
+        const f: TransportFrame = {
+          position: startFrame.position.clone(),
+          forward:  startFrame.forward.clone(),
+          up:       startFrame.up.clone(),
+          right:    startFrame.right.clone(),
+        };
 
-          // Progressive banking: ease in, full bank in middle, ease out
-          let bankingProgress: number;
-          if (t < 0.25) {
-            // Ease in over first 25%
-            bankingProgress = (t / 0.25);
-          } else if (t > 0.75) {
-            // Ease out over last 25%
-            bankingProgress = ((1 - t) / 0.25);
-          } else {
-            // Full banking in middle 50%
-            bankingProgress = 1.0;
+        points.push(frameToPoint(f, 0));
+
+        for (let i = 1; i <= divisions; i++) {
+          const tPrev = (i - 1) / divisions;
+          const tCurr = i / divisions;
+
+          // Height at each parameter via smooth-step (sine integral)
+          const hPrev = height * 0.5 * (1 - Math.cos(Math.PI * tPrev));
+          const hCurr = height * 0.5 * (1 - Math.cos(Math.PI * tCurr));
+
+          // Horizontal distance per step (along local forward projected onto XZ)
+          const horizontalStep = length / divisions;
+
+          // Elevation change this step
+          const dh = hCurr - hPrev;
+
+          // The step vector in local space: forward * horizontalStep + up * dh
+          // We advance position first, then rotate the frame to match the slope.
+          const stepLen = Math.sqrt(horizontalStep * horizontalStep + dh * dh);
+          if (stepLen > 1e-8) {
+            // New forward direction for this step (pitched by slope)
+            const newForward = new THREE.Vector3()
+              .copy(f.forward).multiplyScalar(horizontalStep)
+              .addScaledVector(f.up, dh)
+              .normalize();
+
+            f.position.addScaledVector(f.forward, horizontalStep).addScaledVector(f.up, dh);
+
+            // Rotate forward/up about right to match new slope.
+            // Convention: right = cross(up, forward), so up = cross(forward, right).
+            // Right axis stays fixed through the ramp (no yaw or roll).
+            f.forward.copy(newForward);
+            f.up.crossVectors(f.forward, f.right).normalize();
+            // Renormalise to correct accumulated floating-point drift
+            reorthogonalise(f);
           }
 
-          const currentBanking = maxBanking * bankingProgress * turnDirection;
-
-          // Calculate position on arc (no elevation change from banking itself)
-          const pos = new THREE.Vector3(
-            center.x + Math.cos(theta) * radius,
-            startPos.y,
-            center.z + Math.sin(theta) * radius
-          );
-
-          points.push(pos);
-          bankingAngles.push(currentBanking);
+          points.push(frameToPoint(f, 0));
         }
-        break;
+        return points;
+      }
+
+      // ------------------------------------------------------------------
+      // LOOP: full 360-degree vertical circle traced about the RIGHT axis.
+      // The frame returns to its original orientation after the loop.
+      // This is the case that broke the old Frenet code when tangent ≈ up.
+      // Frame transport handles it naturally: we just keep pitching forward/up
+      // about right by equal angular increments.
+      // ------------------------------------------------------------------
+      case 'loop': {
+        const loopRadius = section.radius || 15;
+        const divisions  = 36; // 10 degrees per step — smooth enough
+        const fullAngle  = Math.PI * 2;
+        const points: FramePoint[] = [];
+
+        // The loop center is above the entry point along the frame's UP axis
+        // (at the start the vehicle is at the bottom of the loop).
+        // Loop center = position + up * loopRadius
+        const loopCenter = new THREE.Vector3()
+          .copy(startFrame.position)
+          .addScaledVector(startFrame.up, loopRadius);
+
+        const f: TransportFrame = {
+          position: startFrame.position.clone(),
+          forward:  startFrame.forward.clone(),
+          up:       startFrame.up.clone(),
+          right:    startFrame.right.clone(),
+        };
+
+        // Pitch quaternion per step: rotate about RIGHT by dAngle
+        const dAngle = fullAngle / divisions;
+
+        for (let i = 0; i <= divisions; i++) {
+          // Compute position on the loop circle
+          const theta = dAngle * i;
+          // From center, go -up * radius at theta=0 (bottom), then rotate
+          const sinT = Math.sin(theta);
+          const cosT = Math.cos(theta);
+
+          // Position = loopCenter - up*R*cosT + forward*R*sinT
+          // (at theta=0: pos = loopCenter - up*R = startPos ✓)
+          const pos = new THREE.Vector3()
+            .copy(loopCenter)
+            .addScaledVector(startFrame.up, -loopRadius * cosT)
+            .addScaledVector(startFrame.forward, loopRadius * sinT);
+
+          // Forward direction: derivative of position w.r.t. theta, normalised
+          // d/dtheta(loopCenter - up*R*cosT + forward*R*sinT)
+          //   = up*R*sinT + forward*R*cosT
+          const fwd = new THREE.Vector3()
+            .copy(startFrame.up).multiplyScalar(sinT)
+            .addScaledVector(startFrame.forward, cosT)
+            .normalize();
+
+          // Up direction: points FROM the car's position TOWARD the loop center
+          // (inward radial = centripetal direction = the car's local "up" as it
+          // traverses the loop). This is the direction the suspension pushes:
+          //   - theta=0 (bottom): upLoop = +startFrame.up  (matches the flat straight)
+          //   - theta=180 (top):  upLoop = -startFrame.up  (car is inverted)
+          //
+          // PREVIOUS BUG: used (pos - loopCenter) which is the OUTWARD radial, causing
+          // the track surface normal to flip 180° at the loop entry (straight→loop
+          // junction) and producing an inside-out collision mesh that ejected the car.
+          const upLoop = new THREE.Vector3().subVectors(loopCenter, pos).normalize();
+
+          // right = cross(up, forward) — consistent convention throughout Track.ts.
+          // At theta=0: right = cross(+Y, +Z) = (+X) ✓ matches the entry frame.
+          const right = new THREE.Vector3().crossVectors(upLoop, fwd).normalize();
+
+          points.push({
+            position: pos,
+            forward:  fwd,
+            up:       upLoop,
+            right:    right,
+            banking:  0,
+          });
+        }
+
+        // Update the running frame to the end-of-loop orientation
+        // (should match startFrame — loop returns to original)
+        void f; // f was declared but we directly computed each point above
+        return points;
       }
 
       default:
         console.warn(`Unknown section type: ${section.type}`);
-        points.push(startPos.clone());
-        bankingAngles.push(0);
+        return [{
+          position: startFrame.position.clone(),
+          forward:  startFrame.forward.clone(),
+          up:       startFrame.up.clone(),
+          right:    startFrame.right.clone(),
+          banking:  0,
+        }];
     }
-
-    return { points, bankingAngles };
   }
 
   /**
-   * Generates visual track mesh from spline.
+   * Builds FramePoints for a circular arc in the local-horizontal plane.
    *
-   * Creates a ribbon mesh following the spline with proper width.
-   * Calculates UVs for texture mapping with smooth, continuous texturing.
-   * Supports banking angles and elevation changes for realistic track geometry.
+   * Convention (matching the original track code):
+   *   positive angleRad → LEFT turn (arc center is to the LOCAL LEFT = -right direction)
+   *   negative angleRad → RIGHT turn (arc center is to the LOCAL RIGHT = +right direction)
    *
-   * UV Mapping Strategy:
-   * - U coordinate (0-1): Maps across track width from left to right
-   * - V coordinate: Accumulates distance along track centerline for continuous tiling
-   * - Texture repeats approximately every 2 units of track distance
-   * - No visible banding or seams at tessellation boundaries
+   * This means `right = cross(up, forward)` so that the initial frame at start of the
+   * arc has `spoke0 = right` and the tangent formula gives `forward` at theta=0.
    *
-   * Banking Support:
-   * - Rotates track surface around tangent vector (track direction)
-   * - Banking metadata stored per control point for smooth interpolation
-   * - Preserves proper normal vectors for lighting and collision
+   * Spoke rotation: CCW about `up` by `angleRad` (positive = CCW = left turn viewed from above).
+   *   spoke(theta) = spoke0*cos(theta) + cross(up, spoke0)*sin(theta)
+   * Tangent (= forward):
+   *   fwd(theta) = d(spoke)/dtheta = (-spoke0*sin + cross(up,spoke0)*cos).normalize()
    *
-   * Closed Loop Handling:
-   * - For closed loops, properly connects last segment back to first
-   * - Handles UV wrapping at seam to prevent visible discontinuities
-   * - Eliminates duplicate geometry at loop closure
+   * Optional banking rolls up about forward using ease-in/mid/ease-out profile.
    *
-   * @param width - Track width in meters
+   * @param startFrame   - Incoming transport frame (right = cross(up, forward))
+   * @param radius       - Arc radius in metres (always positive)
+   * @param angleRad     - Signed arc angle in radians (positive=left, negative=right)
+   * @param divisions    - Number of arc steps
+   * @param maxBanking   - Maximum roll in radians at centre of arc (0 = no banking)
+   */
+  private buildArcFramePoints(
+    startFrame: TransportFrame,
+    radius: number,
+    angleRad: number,
+    divisions: number,
+    maxBanking: number
+  ): FramePoint[] {
+    const points: FramePoint[] = [];
+    const dAngle = angleRad / divisions;
+
+    // Convention: positive angleRad = LEFT turn (matching original JSON angle convention).
+    // Arc center is to the LOCAL LEFT: center = startPos - right * radius.
+    // In local 2D coordinates {right=R, forward=F}:
+    //   center_local = (-R, 0)
+    //   spoke at arc_angle_i: (cos(arc_angle_i), sin(arc_angle_i))
+    //   pos_local_i = center_local + R*(cos(arc_angle_i), sin(arc_angle_i))
+    //     at i=0: (0, 0) = startPos ✓
+    //   forward_local_i = (-sin(arc_angle_i), cos(arc_angle_i)) — tangent of arc
+    //     at i=0: (0, 1) = forward ✓  at i=full: rotated by angleRad ✓
+    const center = new THREE.Vector3()
+      .copy(startFrame.position)
+      .addScaledVector(startFrame.right, -radius);
+
+    // Pre-cache the frame axes (they don't change per step)
+    const sf_right   = startFrame.right.clone();
+    const sf_forward = startFrame.forward.clone();
+
+    for (let i = 0; i <= divisions; i++) {
+      const t = i / divisions;
+
+      // 2D local arc parameterisation in {right, forward} coordinates:
+      //   arc_angle increases from 0 to angleRad (positive = left turn, CCW from above)
+      //   spoke_local = (cos(arc_angle), sin(arc_angle))  → starts at (1,0) = right ✓
+      //   fwd_local   = (-sin(arc_angle), cos(arc_angle)) → starts at (0,1) = fwd ✓
+      const arcAngle    = dAngle * i;
+      const localSpokeR = Math.cos(arcAngle); // component along right
+      const localSpokeF = Math.sin(arcAngle); // component along forward
+      const localFwdR   = -Math.sin(arcAngle); // forward component along right
+      const localFwdF   =  Math.cos(arcAngle); // forward component along forward
+
+      // World position: center + right*localSpokeR*R + fwd*localSpokeF*R
+      const posW = new THREE.Vector3()
+        .copy(center)
+        .addScaledVector(sf_right,   localSpokeR * radius)
+        .addScaledVector(sf_forward, localSpokeF * radius);
+
+      // World forward: right*localFwdR + fwd*localFwdF (already unit length — no normalize needed
+      // but we do it anyway to kill any floating-point drift)
+      const fwdW = new THREE.Vector3()
+        .copy(sf_right).multiplyScalar(localFwdR)
+        .addScaledVector(sf_forward, localFwdF)
+        .normalize();
+
+      // Start with the incoming up (no banking yet)
+      let up = startFrame.up.clone();
+
+      // Apply banking: ease-in 0–25%, full 25–75%, ease-out 75–100%
+      let bankingProgress: number;
+      if (t < 0.25) {
+        bankingProgress = t / 0.25;
+      } else if (t > 0.75) {
+        bankingProgress = (1 - t) / 0.25;
+      } else {
+        bankingProgress = 1.0;
+      }
+      const banking = maxBanking * bankingProgress;
+
+      if (Math.abs(banking) > 1e-5) {
+        // Roll up about forward by banking angle.
+        // Rodrigues (fwd·up = 0):  up' = up*cosB + (fwd × up)*sinB
+        const cosB = Math.cos(banking);
+        const sinB = Math.sin(banking);
+        const crossFwd = new THREE.Vector3().crossVectors(fwdW, up);
+        up = new THREE.Vector3()
+          .copy(up).multiplyScalar(cosB)
+          .addScaledVector(crossFwd, sinB)
+          .normalize();
+      }
+
+      // right = cross(up, fwd) — convention throughout
+      const rightW = new THREE.Vector3().crossVectors(up, fwdW).normalize();
+
+      points.push({ position: posW, forward: fwdW, up, right: rightW, banking });
+    }
+
+    return points;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mesh generation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generates visual track mesh from the stored FramePoints.
+   *
+   * Cross-sections are built from the stored per-point {right, up} axes.
+   * This avoids the worldUp×tangent degeneracy that broke loops in the old code.
+   *
+   * UV Mapping:
+   *   U (0–1): across track width from left to right per profile entry
+   *   V: accumulated arc-length along centerline, tiled every 2 m
+   *
+   * The road surface (profile indices 3–5) and walls (profile indices 0–2, 6–8)
+   * are kept in separate material groups (same mesh). The road-only collider
+   * uses only the road-surface triangle index range so wheel raycasts never
+   * catch wall edges.
+   *
+   * @param width - Track width in metres
    * @returns THREE.Mesh ready for rendering
    */
   private generateMesh(width: number): THREE.Mesh {
     const geometry = new THREE.BufferGeometry();
 
-    // Calculate tessellation based on track complexity
-    // For simple tracks (like our oval), we don't need 1000 points
-    // Use control points as a guide: each control point gets interpolated
-    // Straights need minimal points, curves need more for smoothness
-    const controlPointCount = this.controlPoints.length;
+    // Resample the spline to get uniformly-spaced positions for rendering.
+    // We use ~3 points per stored frame-point for smooth visual geometry.
+    const controlPointCount = this.framePoints.length;
+    const numPoints = Math.max(controlPointCount * 3, 100);
 
-    // For a simple oval (43 control points), this gives ~129 points total
-    // For complex tracks with more control points, scales appropriately
-    const pointsPerControlPoint = 3; // Interpolate 3 points between each control point
-    const numPoints = Math.max(controlPointCount * pointsPerControlPoint, 100);
-
-    console.log(`Tessellating track: ${controlPointCount} control points → ${numPoints} mesh points`);
-    const points = this.spline.getPoints(numPoints);
+    console.log(`Tessellating track: ${controlPointCount} frame-points → ${numPoints} mesh points`);
+    const splinePoints = this.spline.getPoints(numPoints);
 
     const vertices: number[] = [];
-    const indices: number[] = [];
     const uvs: number[] = [];
     const normals: number[] = [];
 
-    // Pre-calculate accumulated distance along spline for V coordinate
+    // Accumulate arc-length for V texture coordinate
     const distanceAccum: number[] = [0];
-    for (let i = 1; i < points.length; i++) {
-      const segmentDistance = points[i].distanceTo(points[i - 1]);
-      distanceAccum.push(distanceAccum[distanceAccum.length - 1] + segmentDistance);
+    for (let i = 1; i < splinePoints.length; i++) {
+      distanceAccum.push(
+        distanceAccum[distanceAccum.length - 1] +
+        splinePoints[i].distanceTo(splinePoints[i - 1])
+      );
     }
-    const totalDistance = distanceAccum[distanceAccum.length - 1];
 
-    // Texture tiling: repeats texture every ~2 units for consistent appearance
-    const textureScale = 2.0;
+    const textureScale = 2.0; // Texture repeats every 2 m
 
-    // Define advanced track profile (Left to right)
-    // mat: 0: asphalt, 1: white line, 2: yellow line, 3: concrete, 4: wall
+    // Track cross-section profile (left to right).
+    // mat: 0=asphalt, 1=white line, 2=yellow line, 3=concrete, 4=wall
+    // isRoad: true for the drivable surface (road collider), false for walls
     const profile = [
-      { x: -width / 2 - 1.5, y: 1.5, u: 0.0, mat: 4 }, // 0: Left Wall Top
-      { x: -width / 2 - 1.5, y: 0.0, u: 0.1, mat: 3 }, // 1: Left Wall Base
-      { x: -width / 2 - 0.2, y: 0.0, u: 0.2, mat: 1 }, // 2: Left Apron Edge
-      { x: -width / 2, y: 0.0, u: 0.25, mat: 0 }, // 3: Left White Line
-      { x: 0, y: 0.0, u: 0.5, mat: 0 }, // 4: Center
-      { x: width / 2, y: 0.0, u: 0.75, mat: 1 }, // 5: Right White Line
-      { x: width / 2 + 0.2, y: 0.0, u: 0.8, mat: 3 }, // 6: Right Apron Edge
-      { x: width / 2 + 1.5, y: 0.0, u: 0.9, mat: 4 }, // 7: Right Wall Base
-      { x: width / 2 + 1.5, y: 1.5, u: 1.0, mat: -1 }  // 8: Right Wall Top
+      { x: -width / 2 - 1.5, y: 1.5, u: 0.00, mat: 4, isRoad: false }, // 0: Left Wall Top
+      { x: -width / 2 - 1.5, y: 0.0, u: 0.10, mat: 3, isRoad: false }, // 1: Left Wall Base
+      { x: -width / 2 - 0.2, y: 0.0, u: 0.20, mat: 1, isRoad: false }, // 2: Left Apron Edge
+      { x: -width / 2,       y: 0.0, u: 0.25, mat: 0, isRoad: true  }, // 3: Left White Line
+      { x: 0,                y: 0.0, u: 0.50, mat: 0, isRoad: true  }, // 4: Center
+      { x:  width / 2,       y: 0.0, u: 0.75, mat: 1, isRoad: true  }, // 5: Right White Line
+      { x:  width / 2 + 0.2, y: 0.0, u: 0.80, mat: 3, isRoad: false }, // 6: Right Apron Edge
+      { x:  width / 2 + 1.5, y: 0.0, u: 0.90, mat: 4, isRoad: false }, // 7: Right Wall Base
+      { x:  width / 2 + 1.5, y: 1.5, u: 1.00, mat: -1,isRoad: false }, // 8: Right Wall Top
     ];
 
+    // Number of material groups (5: asphalt, white_line, yellow_line, concrete, wall)
     const indicesByMaterial: number[][] = [[], [], [], [], []];
 
-    // Generate vertices for all spline points
-    // For closed loops, we'll handle the wraparound in the index generation
-    const numSegments = points.length - 1; // Don't create duplicate vertex at loop end
+    // We only emit vertices for the segment range, not the last wrap-around vertex.
+    const numSegments = splinePoints.length - 1;
 
     for (let i = 0; i < numSegments; i++) {
-      const point = points[i];
-      // Use normalized parameter that respects the actual segment count
-      const t = i / numSegments;
+      const point = splinePoints[i];
 
-      // Get tangent (direction along track)
-      const tangent = this.spline.getTangent(t).normalize();
+      // Retrieve the frame at this parameter via interpolation from stored FramePoints.
+      // The parameter t maps linearly into the framePoints array.
+      const { fwdI, upI } = this.getFrameAtSplineIndex(i, numSegments);
 
-      // Calculate banking angle at this point (interpolate from control point metadata)
-      const bankingAngle = this.getBankingAtParameter(t);
+      const vCoord = distanceAccum[i] / textureScale;
 
-      // Create proper coordinate frame for the track cross-section
-      const worldUp = this.tempVec1.set(0, 1, 0);
-      let binormal = this.tempVec2.crossVectors(worldUp, tangent).normalize();
-
-      if (binormal.lengthSq() < 0.001) {
-        binormal.set(1, 0, 0);
-      }
-
-      const normal = this.tempVec3.crossVectors(tangent, binormal).normalize();
-
-      if (Math.abs(bankingAngle) > 0.001) {
-        const cosBank = Math.cos(bankingAngle);
-        const sinBank = Math.sin(bankingAngle);
-
-        const binormalBanked = new THREE.Vector3()
-          .copy(binormal).multiplyScalar(cosBank)
-          .add(normal.clone().multiplyScalar(sinBank));
-
-        const normalBanked = new THREE.Vector3()
-          .copy(normal).multiplyScalar(cosBank)
-          .sub(binormal.clone().multiplyScalar(sinBank));
-
-        binormal.copy(binormalBanked).normalize();
-        normal.copy(normalBanked).normalize();
-      }
+      // right = cross(up, forward) — convention throughout; recompute per ring from interpolated frame
+      const rightI = this.tempVec3.crossVectors(upI, fwdI).normalize();
 
       for (const p of profile) {
-        // Offset using binormal (X) and normal (Y)
-        const trackPoint = new THREE.Vector3().copy(point)
-          .add(binormal.clone().multiplyScalar(p.x))
-          .add(normal.clone().multiplyScalar(p.y));
+        // Cross-section vertex: offset along right (lateral) and up (normal)
+        const wx = point.x + rightI.x * p.x + upI.x * p.y;
+        const wy = point.y + rightI.y * p.x + upI.y * p.y;
+        const wz = point.z + rightI.z * p.x + upI.z * p.y;
 
-        vertices.push(trackPoint.x, trackPoint.y, trackPoint.z);
-
-        // U comes from profile, V from distance
-        const vCoord = distanceAccum[i] / textureScale;
+        vertices.push(wx, wy, wz);
         uvs.push(p.u, vCoord);
 
-        // Normal computation logic:
+        // Surface normal: upward component of the local frame
         if (p.y > 0 && p.x < 0) {
-          // Left wall normal faces right (approximated by binormal)
-          normals.push(binormal.x, binormal.y, binormal.z);
+          // Left wall: normal faces right (inward)
+          normals.push(rightI.x, rightI.y, rightI.z);
         } else if (p.y > 0 && p.x > 0) {
-          // Right wall normal faces left
-          normals.push(-binormal.x, -binormal.y, -binormal.z);
+          // Right wall: normal faces left (inward)
+          normals.push(-rightI.x, -rightI.y, -rightI.z);
         } else {
-          normals.push(normal.x, normal.y, normal.z);
+          // Road surface: normal is the track up vector
+          normals.push(upI.x, upI.y, upI.z);
         }
       }
     }
 
-    // Generate indices to create triangle pairs
+    // Generate triangle indices (quad strips per profile span)
     for (let i = 0; i < numSegments; i++) {
-      const base = i * profile.length;
+      const base     = i * profile.length;
       const nextBase = ((i + 1) % numSegments) * profile.length;
 
       for (let j = 0; j < profile.length - 1; j++) {
         const mat = profile[j].mat;
         if (mat >= 0) {
           // Triangle 1
-          indicesByMaterial[mat].push(base + j, base + j + 1, nextBase + j);
+          indicesByMaterial[mat].push(base + j,     base + j + 1,     nextBase + j);
           // Triangle 2
           indicesByMaterial[mat].push(base + j + 1, nextBase + j + 1, nextBase + j);
         }
       }
     }
 
-    // Set geometry attributes
-    geometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(vertices, 3)
-    );
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setAttribute(
-      'normal',
-      new THREE.Float32BufferAttribute(normals, 3)
-    );
+    // Flatten indices
     const allIndices: number[] = [];
-
-    // Create material using PBR Material Library
     const materialLib = MaterialLibrary.getInstance();
     const defaultMat = new THREE.MeshStandardMaterial({
       color: 0x2a2a2a,
@@ -667,11 +822,11 @@ export class Track {
     });
 
     const materials = [
-      materialLib.getMaterial('asphalt') || defaultMat,
+      materialLib.getMaterial('asphalt')           || defaultMat,
       materialLib.getMaterial('painted_line_white') || defaultMat,
-      materialLib.getMaterial('painted_line_yellow') || defaultMat,
-      materialLib.getMaterial('concrete') || defaultMat,
-      materialLib.getMaterial('concrete_barrier') || defaultMat
+      materialLib.getMaterial('painted_line_yellow')|| defaultMat,
+      materialLib.getMaterial('concrete')           || defaultMat,
+      materialLib.getMaterial('concrete_barrier')   || defaultMat,
     ];
 
     for (let m = 0; m < materials.length; m++) {
@@ -683,115 +838,211 @@ export class Track {
       }
     }
 
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs,      2));
+    geometry.setAttribute('normal',   new THREE.Float32BufferAttribute(normals,  3));
     geometry.setIndex(allIndices);
 
-    // Compute vertex normals for smooth shading
-    geometry.computeVertexNormals();
+    geometry.computeVertexNormals(); // Smooth shading
 
     const mesh = new THREE.Mesh(geometry, materials);
     mesh.receiveShadow = true;
-    mesh.castShadow = false; // Track doesn't cast shadows
+    mesh.castShadow = false;
     mesh.name = 'track-mesh';
 
     console.log(
-      `Track mesh generated: ${vertices.length / 3} vertices, ${indices.length / 3} triangles`
+      `Track mesh generated: ${vertices.length / 3} vertices, ${allIndices.length / 3} triangles`
     );
 
     return mesh;
   }
 
   /**
-   * Metadata for tracking banking angles per control point.
-   * Index corresponds to control point index.
-   */
-  private controlPointBanking: number[] = [];
-
-  /**
-   * Gets banking angle at a given spline parameter (0-1).
-   * Interpolates between control points for smooth banking transitions.
+   * Interpolates the transport frame at a given spline sample index.
    *
-   * @param t - Spline parameter (0-1)
-   * @returns Banking angle in radians
+   * Maps the linear spline-sample index back into the FramePoints array
+   * and linearly interpolates forward and up between neighbouring frames.
+   *
+   * @param sampleIndex  - Index into the spline sample array (0 … numSegments-1)
+   * @param numSegments  - Total number of spline segments
+   * @returns Interpolated {fwdI, upI} unit vectors
    */
-  private getBankingAtParameter(t: number): number {
-    if (this.controlPointBanking.length === 0) {
-      return 0; // No banking data
+  private getFrameAtSplineIndex(
+    sampleIndex: number,
+    numSegments: number
+  ): { fwdI: THREE.Vector3; upI: THREE.Vector3 } {
+    const n = this.framePoints.length;
+    if (n === 0) {
+      return { fwdI: new THREE.Vector3(0, 0, 1), upI: new THREE.Vector3(0, 1, 0) };
     }
 
-    // Map spline parameter to control point indices
-    const floatIndex = t * (this.controlPointBanking.length - 1);
-    const index1 = Math.floor(floatIndex);
-    const index2 = Math.ceil(floatIndex);
-    const fraction = floatIndex - index1;
+    const t = sampleIndex / numSegments;
+    const rawIdx = t * (n - 1);
+    const i0 = Math.max(0, Math.min(n - 2, Math.floor(rawIdx)));
+    const i1 = i0 + 1;
+    const frac = rawIdx - i0;
 
-    // Clamp indices to valid range
-    const clampedIndex1 = Math.max(0, Math.min(this.controlPointBanking.length - 1, index1));
-    const clampedIndex2 = Math.max(0, Math.min(this.controlPointBanking.length - 1, index2));
+    const fp0 = this.framePoints[i0];
+    const fp1 = this.framePoints[i1 < n ? i1 : n - 1];
 
-    // Linear interpolation between banking angles
-    const banking1 = this.controlPointBanking[clampedIndex1] || 0;
-    const banking2 = this.controlPointBanking[clampedIndex2] || 0;
+    const fwdI = new THREE.Vector3().lerpVectors(fp0.forward, fp1.forward, frac).normalize();
+    const upI  = new THREE.Vector3().lerpVectors(fp0.up,      fp1.up,      frac).normalize();
 
-    return banking1 + (banking2 - banking1) * fraction;
+    return { fwdI, upI };
   }
 
+  // ---------------------------------------------------------------------------
+  // Collider generation — road surface + walls as separate colliders
+  // ---------------------------------------------------------------------------
+
   /**
-   * Generates physics collision mesh for the track.
+   * Generates physics collision geometry for the track.
    *
-   * Creates a static trimesh collider in Rapier.js using the visual mesh geometry.
-   * Simplified from visual mesh for better performance.
+   * Creates TWO Rapier colliders attached to separate static rigid bodies:
+   *   1. Road-surface collider — only the drivable ribbon (profile entries where
+   *      isRoad=true). Wheel raycasts hit this. No wall edges to catch on.
+   *   2. Wall collider — the raised barrier quads. Stops the chassis but
+   *      downward wheel rays cannot reach it.
    *
-   * @param world - Physics world to create collider in
-   * @throws {Error} If physics world not initialized or mesh geometry invalid
+   * Degenerate triangles (zero-area, cross-product length < 1e-8) are dropped
+   * before submitting to Rapier, preventing silent grip loss in the vehicle code.
+   *
+   * @param world - Physics world to create colliders in
    */
   private generateCollider(world: PhysicsWorld): void {
     if (!world.world) {
       throw new Error('Physics world not initialized - cannot create track collider');
     }
 
-    // Extract vertex and index data from mesh
     const positionAttr = this.mesh.geometry.attributes.position;
-    const indexAttr = this.mesh.geometry.index;
+    const indexAttr    = this.mesh.geometry.index;
 
     if (!positionAttr || !indexAttr) {
       throw new Error('Track mesh missing position or index attributes - cannot create collider');
     }
-
     if (!positionAttr.array || !indexAttr.array) {
       throw new Error('Track mesh attributes have no data - cannot create collider');
     }
 
-    const vertices = new Float32Array(positionAttr.array);
-    const indices = new Uint32Array(indexAttr.array);
+    // ---- Split indices into road-surface and wall sets ----
+    // Profile layout (9 entries per cross-section ring):
+    //   0=LeftWallTop, 1=LeftWallBase, 2=LeftApronEdge — wall (non-road)
+    //   3=LeftWhiteLine, 4=Center, 5=RightWhiteLine     — road
+    //   6=RightApronEdge, 7=RightWallBase, 8=RightWallTop — wall (non-road)
+    //
+    // The material groups set in generateMesh map:
+    //   mat 0 (asphalt): profile j=3 and j=4 → road
+    //   mat 1 (white_line): profile j=2 and j=5 — j=2 is apron (wall), j=5 is road
+    //   mat 3 (concrete): profile j=1 and j=6 → wall
+    //   mat 4 (wall/concrete_barrier): profile j=0 and j=7 → wall
+    //
+    // Rather than reconstructing from material groups we take a simpler approach:
+    // read all triangles from the index buffer and classify them by which
+    // profile strip they came from. Profile strip j covers vertices [base+j, base+j+1]
+    // across consecutive rings. Strip j is "road" when profile[j].isRoad is true.
+    //
+    // Profile isRoad flags (indices 0–8): F F F T T T F F F (F=false, T=true)
+    // Strip j=3 (left white line → center): road
+    // Strip j=4 (center → right white line): road
+    // All others: wall
 
-    // Create static rigid body for track (required for raycast detection)
-    const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
-      .setTranslation(0, 0, 0);
-    this.rigidBody = world.world.createRigidBody(rigidBodyDesc);
+    const PROFILE_LENGTH = 9;
+    const ROAD_STRIP_MIN = 3; // inclusive
+    const ROAD_STRIP_MAX = 5; // exclusive (strips 3 and 4 are road)
 
-    // Create static trimesh collider attached to rigid body
-    const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
+    const verts   = new Float32Array(positionAttr.array);
+    const indices = Array.from(indexAttr.array) as number[];
+    const numSegments = Math.round(verts.length / (3 * PROFILE_LENGTH));
 
-    // Set friction for good grip on tarmac
-    colliderDesc.setFriction(1.0);
+    // Classify each triangle as road or wall based on which profile strip it belongs to.
+    // A quad strip for ring i, strip j is formed by vertices:
+    //   (i*PROFILE_LENGTH + j), (i*PROFILE_LENGTH + j+1),
+    //   ((i+1)%numSegments*PROFILE_LENGTH + j), ...
+    // We classify by finding the minimum vertex index modulo PROFILE_LENGTH.
+    const roadIndices: number[] = [];
+    const wallIndices: number[] = [];
 
-    // Use default collision groups so vehicle raycasts can hit it
-    // colliderDesc.setCollisionGroups(0x00010001); // REMOVED - was blocking raycasts
+    const triangleCount = indices.length / 3;
 
-    // Create collider attached to static rigid body (allows raycast hits)
-    this.collider = world.world.createCollider(colliderDesc, this.rigidBody);
+    for (let tri = 0; tri < triangleCount; tri++) {
+      const a = indices[tri * 3 + 0];
+      const b = indices[tri * 3 + 1];
+      const c = indices[tri * 3 + 2];
 
+      // Skip degenerate triangles: check area via cross product
+      const ax = verts[a * 3],     ay = verts[a * 3 + 1], az = verts[a * 3 + 2];
+      const bx = verts[b * 3],     by = verts[b * 3 + 1], bz = verts[b * 3 + 2];
+      const cx = verts[c * 3],     cy = verts[c * 3 + 1], cz = verts[c * 3 + 2];
+
+      const ex = bx - ax, ey = by - ay, ez = bz - az;
+      const fx = cx - ax, fy = cy - ay, fz = cz - az;
+      const crossX = ey * fz - ez * fy;
+      const crossY = ez * fx - ex * fz;
+      const crossZ = ex * fy - ey * fx;
+      const areaSq = crossX * crossX + crossY * crossY + crossZ * crossZ;
+
+      if (areaSq < 1e-14) continue; // degenerate — drop
+
+      // Determine which profile strip: minimum local vertex index (mod PROFILE_LENGTH)
+      const localA = a % PROFILE_LENGTH;
+      const localB = b % PROFILE_LENGTH;
+      const localC = c % PROFILE_LENGTH;
+      const minLocal = Math.min(localA, localB, localC);
+
+      // Profile strip j spans local indices j and j+1
+      // A triangle is road if its strip j falls in [ROAD_STRIP_MIN, ROAD_STRIP_MAX)
+      if (minLocal >= ROAD_STRIP_MIN && minLocal < ROAD_STRIP_MAX) {
+        roadIndices.push(a, b, c);
+      } else {
+        wallIndices.push(a, b, c);
+      }
+    }
+
+    // Create static rigid body for road surface
+    const roadRbDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+    this.rigidBody = world.world.createRigidBody(roadRbDesc);
+
+    if (roadIndices.length >= 3) {
+      const roadColliderDesc = RAPIER.ColliderDesc.trimesh(
+        verts,
+        new Uint32Array(roadIndices)
+      );
+      roadColliderDesc.setFriction(1.0);
+      this.collider = world.world.createCollider(roadColliderDesc, this.rigidBody);
+    }
+
+    // Create separate static rigid body for walls
+    if (wallIndices.length >= 3) {
+      const wallRbDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+      this.wallRigidBody = world.world.createRigidBody(wallRbDesc);
+
+      const wallColliderDesc = RAPIER.ColliderDesc.trimesh(
+        verts,
+        new Uint32Array(wallIndices)
+      );
+      wallColliderDesc.setFriction(0.5);
+      this.wallCollider = world.world.createCollider(wallColliderDesc, this.wallRigidBody);
+    }
+
+    const roadTriCount = roadIndices.length / 3;
+    const wallTriCount = wallIndices.length / 3;
     console.log(
-      `Track collider created: ${vertices.length / 3} vertices, ${indices.length / 3} triangles, isSensor=${this.collider.isSensor()}, handle=${this.collider.handle}`
+      `Track collider created: ${verts.length / 3} vertices, ` +
+      `${roadTriCount} road triangles, ${wallTriCount} wall triangles, ` +
+      `isSensor=${this.collider?.isSensor?.() ?? false}, ` +
+      `handle=${this.collider?.handle ?? 'none'}`
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Debug mesh (unchanged public API)
+  // ---------------------------------------------------------------------------
+
   /**
-   * Creates a debug visualization of the collision mesh.
-   * Renders the physics trimesh as a wireframe overlay to identify collision issues.
+   * Creates a debug wireframe overlay of the collision mesh.
    *
    * @param scene - Three.js scene to add debug mesh to
-   * @returns Debug mesh (can be toggled on/off)
+   * @returns Debug mesh (toggle visibility to show/hide)
    */
   public createCollisionDebugMesh(scene: THREE.Scene): THREE.LineSegments {
     console.log('[TRACK DEBUG] Creating collision debug visualization...');
@@ -800,33 +1051,27 @@ export class Track {
       throw new Error('Cannot create debug mesh - collider not initialized');
     }
 
-    // Get the same geometry used for collision
     const positionAttr = this.mesh.geometry.attributes.position;
-    const indexAttr = this.mesh.geometry.index;
+    const indexAttr    = this.mesh.geometry.index;
 
     if (!positionAttr || !indexAttr) {
       throw new Error('Mesh missing attributes for debug visualization');
     }
 
-    // Create wireframe geometry from the collision mesh
     const wireframeGeometry = new THREE.BufferGeometry();
     wireframeGeometry.setAttribute('position', positionAttr.clone());
     wireframeGeometry.setIndex(indexAttr.clone());
 
-    // Create bright green wireframe material (easy to see)
     const wireframeMaterial = new THREE.LineBasicMaterial({
-      color: 0x00ff00, // Bright green
+      color: 0x00ff00,
       linewidth: 2,
       transparent: true,
       opacity: 0.6,
       depthTest: true,
     });
 
-    // Create edges geometry for cleaner visualization
-    const edgesGeometry = new THREE.EdgesGeometry(wireframeGeometry, 15); // 15 degree threshold
+    const edgesGeometry = new THREE.EdgesGeometry(wireframeGeometry, 15);
     const debugMesh = new THREE.LineSegments(edgesGeometry, wireframeMaterial);
-
-    // Offset slightly above track surface to avoid z-fighting
     debugMesh.position.y = 0.05;
     debugMesh.name = 'track-collision-debug';
 
@@ -837,126 +1082,101 @@ export class Track {
     return debugMesh;
   }
 
+  // ---------------------------------------------------------------------------
+  // Waypoint auto-generation
+  // ---------------------------------------------------------------------------
+
   /**
-   * Automatically generates waypoints from track section boundaries.
+   * Automatically generates waypoints at section boundaries.
    *
-   * Places one waypoint at the end of each section, calculated from the spline.
-   * The first waypoint is marked as a checkpoint with a time bonus.
-   * All waypoints have a trigger radius of 18 meters for an oval track.
-   *
-   * Waypoint generation process:
-   * 1. Calculate the cumulative length of each section (how far along the spline)
-   * 2. For each section end, find the spline parameter t that corresponds to that distance
-   * 3. Use spline.getPoint(t) to get the 3D position on the centerline
-   * 4. Use spline.getTangent(t) to get the forward direction at that point
-   * 5. Place waypoint at Y=0.5 (above track surface) with the calculated direction
-   *
-   * Performance: Computed once during track initialization, zero per-frame cost
+   * Uses the same arc-length estimation as before so the waypoint positions
+   * land on the actual spline. The first waypoint is the checkpoint.
    *
    * @param sections - Array of track section definitions
-   * @returns Array of generated WaypointData
+   * @returns Generated WaypointData array
    */
   private generateWaypoints(sections: TrackSection[]): WaypointData[] {
-    // First pass: calculate section boundaries and total track length
     const sectionLengths: number[] = [];
     const sectionStartDistances: number[] = [0];
     let totalDistance = 0;
 
     for (const section of sections) {
       let sectionLength = 0;
-
       switch (section.type) {
         case 'straight':
           sectionLength = section.length || 50;
           break;
         case 'curve': {
           const radius = section.radius || 30;
-          const angle = ((section.angle || 90) * Math.PI) / 180;
-          sectionLength = radius * angle; // Arc length = radius * angle
+          const angle  = ((section.angle || 90) * Math.PI) / 180;
+          sectionLength = radius * Math.abs(angle);
           break;
         }
         case 'ramp': {
           const length = section.length || 30;
           const height = section.height || 5;
-          // Arc length of ramp (approximation using Euclidean distance)
           sectionLength = Math.sqrt(length * length + height * height);
           break;
         }
         case 'loop': {
           const loopRadius = section.radius || 15;
-          sectionLength = Math.PI * 2 * loopRadius; // Full circle circumference
+          sectionLength = Math.PI * 2 * loopRadius;
           break;
         }
         case 'bank': {
           const radius = section.radius || 40;
-          const angle = ((section.angle || 90) * Math.PI) / 180;
-          sectionLength = radius * angle; // Arc length
+          const angle  = ((section.angle || 90) * Math.PI) / 180;
+          sectionLength = radius * Math.abs(angle);
           break;
         }
         default:
           sectionLength = 50;
       }
-
       sectionLengths.push(sectionLength);
       totalDistance += sectionLength;
       sectionStartDistances.push(totalDistance);
     }
 
-    // Second pass: generate waypoints at section boundaries
     const waypoints: WaypointData[] = [];
 
     for (let i = 0; i < sections.length; i++) {
-      // Distance at the end of this section
       const sectionEndDistance = sectionStartDistances[i + 1];
+      const t = Math.max(0, Math.min(1, sectionEndDistance / totalDistance));
 
-      // Convert distance to spline parameter (0-1, where 1 is the full loop)
-      const t = sectionEndDistance / totalDistance;
+      const position = this.spline.getPoint(t);
+      const tangent  = this.spline.getTangent(t).normalize();
 
-      // Clamp to valid range in case of floating point issues
-      const tClamped = Math.max(0, Math.min(1, t));
-
-      // Get position and direction from spline
-      const position = this.spline.getPoint(tClamped);
-      const tangent = this.spline.getTangent(tClamped);
-
-      // Normalize tangent to get direction
-      tangent.normalize();
-
-      // Create waypoint with position at Y=0.5 (above track surface)
-      const waypoint: WaypointData = {
+      waypoints.push({
         id: i,
-        position: [position.x, 0.5, position.z],
-        direction: [tangent.x, 0, tangent.z],
+        position:    [position.x, position.y + 0.5, position.z],
+        direction:   [tangent.x, 0, tangent.z],
         triggerRadius: 18,
-        isCheckpoint: i === 0, // First waypoint is the checkpoint
-        timeBonus: i === 0 ? 30 : undefined,
-      };
-
-      waypoints.push(waypoint);
+        isCheckpoint: i === 0,
+        timeBonus:   i === 0 ? 30 : undefined,
+      });
     }
 
     console.log(`Auto-generated ${waypoints.length} waypoints from ${sections.length} sections`);
-
     return waypoints;
   }
 
-  /**
-   * Creates obstacles from track data.
-   *
-   * @param obstacleData - Array of obstacle configurations
-   * @param world - Physics world for collision
-   * @param scene - Three.js scene to add obstacles to
-   */
-  private createObstacles(obstacleData: ObstacleData[] | undefined, world: PhysicsWorld, scene: THREE.Scene): void {
-    if (!obstacleData || obstacleData.length === 0) {
-      return;
-    }
+  // ---------------------------------------------------------------------------
+  // Obstacle creation
+  // ---------------------------------------------------------------------------
+
+  private createObstacles(
+    obstacleData: ObstacleData[] | undefined,
+    world: PhysicsWorld,
+    scene: THREE.Scene
+  ): void {
+    if (!obstacleData || obstacleData.length === 0) return;
 
     for (const data of obstacleData) {
       const position = new THREE.Vector3(data.position[0], data.position[1], data.position[2]);
-      const obstacleType = data.type === 'cone' ? ObstacleType.CONE :
-        data.type === 'barrier' ? ObstacleType.BARRIER :
-          ObstacleType.TIRE_WALL;
+      const obstacleType =
+        data.type === 'cone'      ? ObstacleType.CONE :
+        data.type === 'barrier'   ? ObstacleType.BARRIER :
+                                    ObstacleType.TIRE_WALL;
 
       const obstacle = new Obstacle(obstacleType, position, world, scene);
       this.obstacles.push(obstacle);
@@ -965,62 +1185,40 @@ export class Track {
     console.log(`Created ${this.obstacles.length} obstacles`);
   }
 
+  // ---------------------------------------------------------------------------
+  // Public API (stable signatures, unchanged)
+  // ---------------------------------------------------------------------------
+
   /**
    * Gets the track's spawn point for the player vehicle.
-   *
-   * @returns Object with position and rotation
    */
   getSpawnPoint(): { position: THREE.Vector3; rotation: THREE.Quaternion } {
     const spawn = this.trackData.spawnPoint;
-
     return {
-      position: new THREE.Vector3(
-        spawn.position[0],
-        spawn.position[1],
-        spawn.position[2]
-      ),
-      rotation: new THREE.Quaternion(
-        spawn.rotation[0],
-        spawn.rotation[1],
-        spawn.rotation[2],
-        spawn.rotation[3]
-      ),
+      position: new THREE.Vector3(spawn.position[0], spawn.position[1], spawn.position[2]),
+      rotation: new THREE.Quaternion(spawn.rotation[0], spawn.rotation[1], spawn.rotation[2], spawn.rotation[3]),
     };
   }
 
   /**
    * Gets track waypoint data.
-   *
-   * Returns auto-generated waypoints if none were provided in track data.
-   *
-   * @returns Array of waypoint configurations
    */
   getWaypoints(): WaypointData[] {
     return this.trackData.waypoints || [];
   }
 
-  /**
-   * Gets the track name.
-   *
-   * @returns Track name string
-   */
+  /** Gets the track name. */
   getName(): string {
     return this.trackData.name;
   }
 
-  /**
-   * Gets the track's visual mesh.
-   *
-   * @returns THREE.Mesh for rendering
-   */
+  /** Gets the track's visual mesh. */
   getMesh(): THREE.Mesh {
     return this.mesh;
   }
 
   /**
    * Gets the bounding box of the track (for minimap generation).
-   *
-   * @returns THREE.Box3 containing entire track
    */
   getBounds(): THREE.Box3 {
     const box = new THREE.Box3();
@@ -1030,17 +1228,26 @@ export class Track {
 
   /**
    * Gets surface type at a given position (for tire grip calculation).
-   *
    * Currently returns TARMAC for all positions.
-   * Future: Ray cast to determine surface material.
-   *
-   * @param _position - Position to query (unused for now)
-   * @returns Surface type at position
    */
   getSurfaceType(_position: THREE.Vector3): SurfaceType {
-    // TODO: Implement multi-material surface detection
-    // For now, entire track is tarmac
     return SurfaceType.TARMAC;
+  }
+
+  /**
+   * Returns whether the track was detected as a closed loop.
+   * Useful for camera/minimap systems.
+   */
+  getIsClosed(): boolean {
+    return this.isClosed;
+  }
+
+  /**
+   * Returns the stored frame points (for camera/chase-cam orientation queries).
+   * Read-only — do not mutate.
+   */
+  getFramePoints(): ReadonlyArray<Readonly<FramePoint>> {
+    return this.framePoints;
   }
 
   /**
@@ -1079,15 +1286,24 @@ export class Track {
       this.backgroundSystem = null;
     }
 
-    // Remove collider and rigid body from physics world
+    // Remove road collider + rigid body
     if (this.collider && this.physicsWorld.world) {
       this.physicsWorld.world.removeCollider(this.collider, false);
       this.collider = null;
     }
-
     if (this.rigidBody && this.physicsWorld.world) {
       this.physicsWorld.world.removeRigidBody(this.rigidBody);
       this.rigidBody = null;
+    }
+
+    // Remove wall collider + rigid body
+    if (this.wallCollider && this.physicsWorld.world) {
+      this.physicsWorld.world.removeCollider(this.wallCollider, false);
+      this.wallCollider = null;
+    }
+    if (this.wallRigidBody && this.physicsWorld.world) {
+      this.physicsWorld.world.removeRigidBody(this.wallRigidBody);
+      this.wallRigidBody = null;
     }
 
     console.log(`Track "${this.trackData.name}" disposed`);
@@ -1096,9 +1312,8 @@ export class Track {
   /**
    * Loads track data from JSON file.
    *
-   * Waypoints are optional in the JSON file - they will be auto-generated from
-   * section boundaries if not provided. Only name, sections, and spawnPoint
-   * are required.
+   * Only name, sections, and spawnPoint are required; waypoints are optional
+   * and will be auto-generated if absent.
    *
    * @param path - Path to track JSON file
    * @returns Promise resolving to TrackData
@@ -1106,18 +1321,13 @@ export class Track {
   static async loadTrackData(path: string): Promise<TrackData> {
     try {
       const response = await fetch(path);
-
       if (!response.ok) {
         throw new Error(`Failed to load track: ${response.statusText}`);
       }
-
       const data: TrackData = await response.json();
-
-      // Validate track data (waypoints optional, will be auto-generated if missing)
       if (!data.name || !data.sections || !data.spawnPoint) {
         throw new Error('Invalid track data: missing required fields (name, sections, spawnPoint)');
       }
-
       console.log(`Track data loaded from ${path}: ${data.name}`);
       return data;
     } catch (error) {
