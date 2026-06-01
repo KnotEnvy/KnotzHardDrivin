@@ -437,52 +437,41 @@ export class Track {
         // This gives h(0)=0, h(1)=height with zero first-derivative at both
         // ends — matching whatever pitch the incoming frame has.
 
-        const f: TransportFrame = {
-          position: startFrame.position.clone(),
-          forward:  startFrame.forward.clone(),
-          up:       startFrame.up.clone(),
-          right:    startFrame.right.clone(),
-        };
+        // Direct placement avoids elevation drift: each point's HORIZONTAL distance
+        // is exactly length*t and its HEIGHT is exactly h(t), so the ramp climbs by
+        // precisely `height` and never over-counts elevation. (The previous approach
+        // advanced along the PITCHED forward by horizontalStep AND added dh, which
+        // double-counted height and leaked tens of metres of climb into the long
+        // banks that follow.)  h(t)=height*0.5*(1-cos(πt)): h(0)=0, h(1)=height, flat ends.
+        const startPos = startFrame.position.clone();
+        const horizFwd = new THREE.Vector3(startFrame.forward.x, 0, startFrame.forward.z);
+        if (horizFwd.lengthSq() < 1e-6) horizFwd.copy(startFrame.forward);
+        horizFwd.normalize();
+        const right = startFrame.right.clone();
+        const WORLD_UP = new THREE.Vector3(0, 1, 0);
+        const heightAt = (t: number) => height * 0.5 * (1 - Math.cos(Math.PI * t));
 
-        points.push(frameToPoint(f, 0));
+        let prevPos = startPos.clone();
+        for (let i = 0; i <= divisions; i++) {
+          const t = i / divisions;
+          const pos = startPos.clone()
+            .addScaledVector(horizFwd, length * t)
+            .addScaledVector(WORLD_UP, heightAt(t));
 
-        for (let i = 1; i <= divisions; i++) {
-          const tPrev = (i - 1) / divisions;
-          const tCurr = i / divisions;
-
-          // Height at each parameter via smooth-step (sine integral)
-          const hPrev = height * 0.5 * (1 - Math.cos(Math.PI * tPrev));
-          const hCurr = height * 0.5 * (1 - Math.cos(Math.PI * tCurr));
-
-          // Horizontal distance per step (along local forward projected onto XZ)
-          const horizontalStep = length / divisions;
-
-          // Elevation change this step
-          const dh = hCurr - hPrev;
-
-          // The step vector in local space: forward * horizontalStep + up * dh
-          // We advance position first, then rotate the frame to match the slope.
-          const stepLen = Math.sqrt(horizontalStep * horizontalStep + dh * dh);
-          if (stepLen > 1e-8) {
-            // New forward direction for this step (pitched by slope)
-            const newForward = new THREE.Vector3()
-              .copy(f.forward).multiplyScalar(horizontalStep)
-              .addScaledVector(f.up, dh)
-              .normalize();
-
-            f.position.addScaledVector(f.forward, horizontalStep).addScaledVector(f.up, dh);
-
-            // Rotate forward/up about right to match new slope.
-            // Convention: right = cross(up, forward), so up = cross(forward, right).
-            // Right axis stays fixed through the ramp (no yaw or roll).
-            f.forward.copy(newForward);
-            f.up.crossVectors(f.forward, f.right).normalize();
-            // Renormalise to correct accumulated floating-point drift
-            reorthogonalise(f);
-          }
-
-          points.push(frameToPoint(f, 0));
+          // Forward = surface tangent (finite difference); flat at the ends.
+          const forward = i === 0 ? horizFwd.clone() : pos.clone().sub(prevPos).normalize();
+          // up = cross(forward, right) keeps the convention right = cross(up, forward).
+          const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+          points.push({ position: pos, forward, up, right: right.clone(), banking: 0 });
+          prevPos = pos.clone();
         }
+
+        // Force the exit exactly level so following sections (esp. long banks) don't
+        // inherit residual pitch. Net elevation change is unaffected.
+        const exit = points[points.length - 1];
+        exit.forward.copy(horizFwd);
+        exit.up.copy(WORLD_UP);
+        exit.right.crossVectors(exit.up, exit.forward).normalize();
         return points;
       }
 

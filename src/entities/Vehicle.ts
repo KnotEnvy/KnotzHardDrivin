@@ -1097,8 +1097,13 @@ export class Vehicle {
       steeringDrift = Math.sin(this.criticalDamageTimer * Math.PI) * 0.05; // ±5% drift
     }
 
+    // Steering sign is negated so the car turns the way the player presses. Verified
+    // empirically: without this, pressing left (input.steering < 0) steered the car to
+    // screen-right (the chase camera sits behind the car looking +Z, so world +X is
+    // screen-LEFT). input.steering keeps its meaning so the Ackermann inner/outer logic
+    // below stays correct, and the visual wheels (driven from steeringAngle) match.
     const targetSteeringAngle =
-      (this.input.steering + steeringDrift) * this.config.wheels[0].maxSteeringAngle * Math.max(0.3, steeringFactor) * steeringMultiplier;
+      -(this.input.steering + steeringDrift) * this.config.wheels[0].maxSteeringAngle * Math.max(0.3, steeringFactor) * steeringMultiplier;
 
     // Update steering for front wheels
     for (let i = 0; i < 2; i++) {
