@@ -81,6 +81,21 @@ export class CareerProgressionSystem {
    * - Gold: baseTime * 1.0 (target time - requires mastery)
    */
   private readonly TRACK_REGISTRY: TrackMetadata[] = [
+    // === FLAGSHIP STUNT TRACK (always unlocked) ===
+    {
+      id: 'stunt',
+      name: 'Hard Drivin\' Stunt Circuit',
+      description: 'The signature stunt circuit. Full-throttle run-up, launch ramp, banked hairpin, and the centerpiece: a full vertical loop-de-loop at speed.',
+      difficulty: 3,
+      path: '/assets/tracks/stunt.json',
+      unlocked: true,
+      starThresholds: {
+        bronze: 180000,  // 3:00.000
+        silver: 140000,  // 2:20.000
+        gold: 110000,    // 1:50.000
+      },
+    },
+
     // === DIFFICULTY 1: BEGINNER TRACKS ===
     {
       id: 'oval',
@@ -614,7 +629,7 @@ export class CareerProgressionSystem {
   private createNewProgress(): CareerProgress {
     return {
       version: this.SAVE_VERSION,
-      unlockedTracks: ['oval'], // First track always unlocked
+      unlockedTracks: ['stunt', 'oval'], // Flagship stunt + first beginner track always unlocked
       completedTracks: new Map(),
       currentTrack: 'oval',
       totalRaces: 0,

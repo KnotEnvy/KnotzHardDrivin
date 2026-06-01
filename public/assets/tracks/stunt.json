@@ -1,0 +1,106 @@
+{
+  "name": "Hard Drivin' Stunt Circuit",
+  "width": 10,
+  "skybox": "day",
+  "timeOfDay": "day",
+  "background": "desert",
+  "sections": [
+    {
+      "type": "straight",
+      "length": 200,
+      "notes": "A-side run-up: 200 m clean straight to build ~27 m/s before the loop."
+    },
+    {
+      "type": "loop",
+      "radius": 18,
+      "notes": "CENTERPIECE: full vertical loop. Car enters at ~27 m/s, apex speed ~20 m/s (min safe = 13.3 m/s). Stability-control suppression allows the inverted transit."
+    },
+    {
+      "type": "straight",
+      "length": 50,
+      "notes": "Post-loop exit buffer — car decelerates naturally to ~22 m/s before the hairpin."
+    },
+    {
+      "type": "bank",
+      "radius": 200,
+      "angle": 180,
+      "banking": 15,
+      "notes": "First hairpin (r=200 m, wide): centripetal accel at 22 m/s = 2.4 m/s^2 — well within grip limit. Links A-side to B-side."
+    },
+    {
+      "type": "straight",
+      "length": 100,
+      "notes": "B-side beginning — car re-accelerates."
+    },
+    {
+      "type": "ramp",
+      "length": 40,
+      "height": 6,
+      "notes": "Launch ramp: bonus stunt on the return side."
+    },
+    {
+      "type": "ramp",
+      "length": 40,
+      "height": -6,
+      "notes": "Landing ramp: returns to track level."
+    },
+    {
+      "type": "straight",
+      "length": 70,
+      "notes": "B-side exit (100+40+40+70 = 250 m total, matching A-side 200+50 = 250 m)."
+    },
+    {
+      "type": "bank",
+      "radius": 200,
+      "angle": 180,
+      "banking": 15,
+      "notes": "Closing hairpin — returns to spawn position and facing. Track closes within 1 m."
+    }
+  ],
+  "spawnPoint": {
+    "position": [0, 0.5, 5],
+    "rotation": [0, 0, 0, 1]
+  },
+  "scenery": [
+    {
+      "type": "grandstand",
+      "position": [30, 0, 80],
+      "rotation": -90,
+      "scale": 1.5
+    },
+    {
+      "type": "grandstand",
+      "position": [30, 0, 150],
+      "rotation": -90,
+      "scale": 1.5
+    },
+    {
+      "type": "grandstand",
+      "position": [30, 0, 210],
+      "rotation": -90,
+      "scale": 1.5
+    },
+    {
+      "type": "tree",
+      "position": [70, 0, 100],
+      "instanceCount": 12,
+      "spread": 50
+    },
+    {
+      "type": "tree",
+      "position": [70, 0, 180],
+      "instanceCount": 12,
+      "spread": 50
+    },
+    {
+      "type": "flag",
+      "position": [0, 0.5, -2],
+      "scale": 1.5
+    },
+    {
+      "type": "flag",
+      "position": [5, 0.5, -2],
+      "scale": 1.5
+    }
+  ]
+}

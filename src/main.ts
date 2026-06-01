@@ -1,10 +1,15 @@
 // Phase 2: Vehicle Physics & Input Test
 import { GameEngine, GameState } from './core/GameEngine';
+import { CareerProgressionSystem } from './systems/CareerProgressionSystem';
 
 const engine = new GameEngine();
 
 // Expose engine on window for E2E testing
 (window as any).gameEngine = engine;
+
+// Expose CareerProgressionSystem singleton so E2E tests can call setCurrentTrack()
+// before starting a race, without needing to navigate the full UI.
+(window as any).__careerSystem = CareerProgressionSystem.getInstance();
 
 // Start the game engine
 engine.start().then(() => {
