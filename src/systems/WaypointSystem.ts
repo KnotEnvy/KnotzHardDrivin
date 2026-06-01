@@ -209,6 +209,29 @@ export class WaypointSystem {
   }
 
   /**
+   * Gets the position of the LAST REACHED (already passed) waypoint.
+   *
+   * Used by CrashManager to respawn the vehicle at a safe driveable location
+   * on the track rather than mid-air (e.g. when the crash happens on the loop).
+   *
+   * @returns The position of the most recently passed waypoint, or null if
+   *   no waypoint has been passed yet (player is still on the very first leg).
+   */
+  getLastReachedWaypointPosition(): THREE.Vector3 | null {
+    // currentWaypoint is the NEXT waypoint to reach.
+    // The last reached waypoint index is one behind it (wrapping around laps).
+    if (this.currentWaypoint === 0 && this.lapCount === 0) {
+      // No waypoint has been passed yet — return null so the caller falls back
+      // to the track spawn point.
+      return null;
+    }
+    const total = this.waypoints.length;
+    const lastIdx = (this.currentWaypoint - 1 + total) % total;
+    // Return a CLONE so callers can safely mutate it (e.g. add ride-height offset).
+    return this.waypoints[lastIdx].position.clone();
+  }
+
+  /**
    * Gets the current waypoint index
    * @returns Current waypoint index (0-based)
    */

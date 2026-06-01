@@ -469,10 +469,23 @@ export class GameEngine {
           if (!this.replayPlayer.isPlayingActive()) {
             console.log('Replay finished, respawning vehicle');
 
-            // Respawn vehicle at last checkpoint
-            if (this.waypointSystem && this.vehicle) {
-              const respawnPos = this.waypointSystem.getNextWaypointPosition();
-              const respawnRot = new THREE.Quaternion(); // Default rotation
+            // Respawn at the track spawn point (guaranteed flat, driveable ground).
+            // Auto-generated waypoint positions can land mid-loop on elevated
+            // geometry and are unsafe for respawn, so we always use the track
+            // spawn which provides the full run-up distance for a loop retry.
+            if (this.vehicle) {
+              let respawnPos: THREE.Vector3;
+              let respawnRot: THREE.Quaternion;
+
+              if (this.track) {
+                const sp = this.track.getSpawnPoint();
+                respawnPos = sp.position;
+                respawnRot = sp.rotation;
+              } else {
+                respawnPos = new THREE.Vector3(0, 1, 5);
+                respawnRot = new THREE.Quaternion();
+              }
+
               this.vehicle.reset(respawnPos, respawnRot);
             }
 
@@ -1684,7 +1697,8 @@ export class GameEngine {
         this.vehicle,
         this.track,
         this.cameraSystem, // Pass camera system for shake effects
-        (state: GameState) => this.setState(state)
+        (state: GameState) => this.setState(state),
+        this.waypointSystem // For safe respawn at last passed waypoint
       );
 
       // Wire up crash event listener for replay triggering

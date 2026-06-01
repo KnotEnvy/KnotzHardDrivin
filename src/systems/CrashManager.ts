@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Vector3, Quaternion } from 'three';
 import { Vehicle } from '../entities/Vehicle';
 import { Track } from '../entities/Track';
 import { GameState } from '../core/GameEngine';
@@ -6,6 +6,7 @@ import { DamageSeverity } from '../types/VehicleTypes';
 import { TimerSystem } from './TimerSystem';
 import { DamageVisualizationSystem } from './DamageVisualizationSystem';
 import { CameraSystem } from './CameraSystem';
+import { WaypointSystem } from './WaypointSystem';
 
 /**
  * Crash severity classification based on impact force.
@@ -187,6 +188,11 @@ export class CrashManager {
   private track: Track | null = null;
 
   /**
+   * Reference to waypoint system for safe respawn at the last passed waypoint.
+   */
+  private waypointSystem: WaypointSystem | null = null;
+
+  /**
    * Reference to camera system for shake effects.
    */
   private cameraSystem: CameraSystem | null = null;
@@ -201,6 +207,20 @@ export class CrashManager {
    * Current game time (seconds) - updated externally.
    */
   private currentTime = 0;
+
+  /**
+   * Timestamp of the last time the vehicle was significantly inverted (up.y < -0.3).
+   * Used to suppress the hard-landing detector for a few seconds after the car exits
+   * an inverted loop section — the car legitimately falls from loop height and should
+   * not trigger a crash just because the landing speed is high.
+   */
+  private lastInversionTime = -999;
+
+  /**
+   * Duration (seconds) after inversion during which hard-landing detection is suppressed.
+   * Gives the car time to land from the loop exit without triggering a crash.
+   */
+  private readonly POST_INVERSION_GRACE = 5.0;
 
   /**
    * Enables/disables crash detection.
@@ -247,10 +267,12 @@ export class CrashManager {
     vehicle: Vehicle,
     track: Track,
     cameraSystem: CameraSystem,
-    stateTransitionCallback: (state: GameState) => void
+    stateTransitionCallback: (state: GameState) => void,
+    waypointSystem?: WaypointSystem
   ): void {
     this.vehicle = vehicle;
     this.track = track;
+    this.waypointSystem = waypointSystem ?? null;
     this.cameraSystem = cameraSystem;
     this.stateTransitionCallback = stateTransitionCallback;
     this.enabled = true;
@@ -293,6 +315,12 @@ export class CrashManager {
     // Increment time since enabled for grace period check
     this.timeSinceEnabled += deltaTime;
 
+    // Track inversion for the post-inversion hard-landing grace period
+    const transform = this.vehicle.getTransform();
+    if (transform.up.y < -0.3) {
+      this.lastInversionTime = this.currentTime;
+    }
+
     // Check for crashes based on velocity changes
     this.detectCollisionImpact();
 
@@ -326,35 +354,63 @@ export class CrashManager {
       return;
     }
 
+    // Post-inversion grace period: after the car completes the inverted part of a
+    // loop, it falls from height and lands at high speed. Suppress both hard-landing
+    // and collision-impact detection to avoid a false crash from the exit landing.
+    if (this.currentTime - this.lastInversionTime < this.POST_INVERSION_GRACE) {
+      return;
+    }
+
     const currentTransform = this.vehicle.getTransform();
     const currentVelocity = currentTransform.linearVelocity;
 
     // Calculate velocity delta (reuse temp vector, no allocation)
     this.velocityDelta.copy(currentVelocity).sub(this.previousVelocity);
-    const velocityChangeMagnitude = this.velocityDelta.length();
 
-    // Check if this is a velocity DECREASE (collision) or INCREASE (acceleration)
-    // Only trigger crashes on decreases to avoid false positives during normal driving
+    // Use SCALAR speed drop rather than vector-delta magnitude.
+    //
+    // Rationale: centripetal acceleration (loop, banked turn) continuously
+    // rotates the velocity vector without reducing its magnitude — the car
+    // keeps the same speed while changing direction.  Using the vector-delta
+    // magnitude would measure that direction-change as a huge "deceleration"
+    // and trigger a false crash every time the car enters the loop.
+    //
+    // A genuine wall/obstacle impact DOES drop the scalar speed (kinetic energy
+    // is lost to the collision), so the scalar drop is the right discriminator.
     const currentSpeed = currentVelocity.length();
     const previousSpeed = this.previousVelocity.length();
-    const isDeceleration = currentSpeed < previousSpeed;
+    const scalarSpeedDrop = previousSpeed - currentSpeed; // positive = deceleration
 
-    // No collision if velocity is stable
-    if (velocityChangeMagnitude < 0.1) {
+    // Minimum per-frame speed drop to qualify as a crash impulse.
+    //
+    // Centripetal / suspension forces (loop, banked turn, ramp): the SCALAR
+    // speed magnitude barely changes — the car changes direction without losing
+    // kinetic energy.  A real wall/obstacle impact does transfer kinetic energy
+    // out of the car, producing a measurable per-tick scalar-speed decrease.
+    //
+    // Hard braking at ~1.5 G = ~15 m/s²  →  15/60 ≈ 0.25 m/s per tick
+    // Smooth ramp/loop entry contact     →  typically < 0.5 m/s per tick
+    // Real wall crash at 26 m/s          →  many m/s per tick (> 5 m/s typical)
+    //
+    // Minimum per-frame speed drop.
+    //
+    // Centripetal forces (loop, bank): zero scalar speed change → never triggers.
+    // Hard braking: ~15 m/s² → 0.25 m/s per tick → no trigger.
+    // Loop entry contact (car box slides over rising ramp): 1-2 m/s per tick.
+    // Genuine wall crash at >10 m/s: 5+ m/s per tick → triggers.
+    //
+    // Threshold set at 5.0 m/s/tick (300 m/s² = 30 G) to skip loop-entry contacts
+    // while catching genuine high-speed wall impacts (30+ G).
+    const MIN_CRASH_SPEED_DROP = 5.0; // m/s per physics tick (60 Hz)
+    if (scalarSpeedDrop < MIN_CRASH_SPEED_DROP) {
       return;
     }
 
-    // Ignore velocity increases (acceleration) - only detect decelerations (collisions)
-    if (!isDeceleration) {
-      return;
-    }
-
-    // Calculate impact force from velocity change
-    // F = m * a, where a = dv / dt
-    // We approximate: F ≈ m * dv / dt
-    // For a fixed 60Hz update: dt = 0.01667
+    // Calculate impact force from scalar speed drop.
+    // F = m * Δv / Δt  — here Δv is the scalar speed loss, so this measures
+    // the longitudinal deceleration impulse rather than the centripetal force.
     const vehicleMass = 1200; // kg (from default config)
-    const impactForce = vehicleMass * velocityChangeMagnitude / 0.01667;
+    const impactForce = vehicleMass * scalarSpeedDrop / 0.01667;
 
     // Only trigger on significant impacts
     if (impactForce < this.MINOR_CRASH_THRESHOLD) {
@@ -418,6 +474,14 @@ export class CrashManager {
 
     // Grace period: skip crash detection immediately after spawn
     if (this.timeSinceEnabled < this.GRACE_PERIOD) {
+      return;
+    }
+
+    // Post-inversion grace period: after the car has been inverted (on the loop),
+    // it may legitimately fall from loop height and land at high vertical speed.
+    // Suppress hard-landing detection for POST_INVERSION_GRACE seconds after
+    // the last inversion event to avoid a false crash on the loop exit landing.
+    if (this.currentTime - this.lastInversionTime < this.POST_INVERSION_GRACE) {
       return;
     }
 
@@ -830,16 +894,25 @@ export class CrashManager {
       return;
     }
 
-    // Get spawn point from track
+    // Respawn at the track spawn point — this guarantees flat, driveable ground.
+    //
+    // Auto-generated waypoint positions are sampled from the spline parameter
+    // space and can land anywhere on the track geometry (including mid-loop
+    // elevated sections), making them unsafe for respawn without additional
+    // height filtering.  The spawn point is always at ground level and far
+    // enough back from the loop to give a full run-up, which is the correct
+    // player experience after a loop crash.
     const spawnPoint = this.track.getSpawnPoint();
+    const respawnPosition = spawnPoint.position;
+    const respawnRotation = spawnPoint.rotation;
+
+    console.log(`Vehicle respawned at track spawn: (${respawnPosition.x.toFixed(1)}, ${respawnPosition.y.toFixed(1)}, ${respawnPosition.z.toFixed(1)})`);
 
     // Reset vehicle position and velocity
-    this.vehicle.reset(spawnPoint.position, spawnPoint.rotation);
+    this.vehicle.reset(respawnPosition, respawnRotation);
 
     // Reset velocity tracking
     this.previousVelocity.set(0, 0, 0);
-
-    console.log('Vehicle respawned at spawn point');
   }
 
   /**
@@ -954,6 +1027,7 @@ export class CrashManager {
     this.replayTriggerListeners = [];
     this.vehicle = null;
     this.track = null;
+    this.waypointSystem = null;
     this.stateTransitionCallback = null;
     this.enabled = false;
 

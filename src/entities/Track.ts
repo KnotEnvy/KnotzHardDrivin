@@ -991,7 +991,9 @@ export class Track {
 
       // Profile strip j spans local indices j and j+1
       // A triangle is road if its strip j falls in [ROAD_STRIP_MIN, ROAD_STRIP_MAX)
-      if (minLocal >= ROAD_STRIP_MIN && minLocal < ROAD_STRIP_MAX) {
+      const isRoadStrip = minLocal >= ROAD_STRIP_MIN && minLocal < ROAD_STRIP_MAX;
+
+      if (isRoadStrip) {
         roadIndices.push(a, b, c);
       } else {
         wallIndices.push(a, b, c);
@@ -1008,6 +1010,19 @@ export class Track {
         new Uint32Array(roadIndices)
       );
       roadColliderDesc.setFriction(1.0);
+      // Collision group: membership = groups 0+1 (0x0003), filter = group 0 only (0x0001).
+      //
+      // The vehicle's wheel RAYCASTs use filter=0xffff0001 (detect group 0), so they still
+      // detect the road surface for suspension forces — this is unchanged.
+      //
+      // The vehicle CHASSIS BOX collider is set to membership=group1 (0x0002), filter=0x0001.
+      // road_filter (0x0001) & chassis_membership (0x0002) = 0 → road does NOT generate
+      // chassis contacts. This prevents the loop's curved road surface from decelerating
+      // the car through unwanted chassis-road collisions (the loop backward-section road
+      // at ~1–2 m height would otherwise block the car mid-approach).
+      //
+      // Wall and ground colliders retain default groups and still stop the chassis normally.
+      roadColliderDesc.setCollisionGroups(0x00030001);
       this.collider = world.world.createCollider(roadColliderDesc, this.rigidBody);
     }
 

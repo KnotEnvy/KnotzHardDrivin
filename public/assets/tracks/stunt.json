@@ -7,25 +7,15 @@
   "sections": [
     {
       "type": "straight",
-      "length": 200,
-      "notes": "A-side run-up: 200 m clean straight to build ~27 m/s before the loop."
-    },
-    {
-      "type": "loop",
-      "radius": 18,
-      "notes": "CENTERPIECE: full vertical loop. Car enters at ~27 m/s, apex speed ~20 m/s (min safe = 13.3 m/s). Stability-control suppression allows the inverted transit."
-    },
-    {
-      "type": "straight",
-      "length": 50,
-      "notes": "Post-loop exit buffer — car decelerates naturally to ~22 m/s before the hairpin."
+      "length": 250,
+      "notes": "A-side main straight (250 m). A vertical loop is planned here as a future milestone; it is descoped for now because a full loop overlaps its own approach lane and needs a corkscrew/cleared-approach redesign. Adhesion physics is already in place for when it returns."
     },
     {
       "type": "bank",
       "radius": 200,
       "angle": 180,
       "banking": 15,
-      "notes": "First hairpin (r=200 m, wide): centripetal accel at 22 m/s = 2.4 m/s^2 — well within grip limit. Links A-side to B-side."
+      "notes": "First hairpin (r=200 m, wide): links A-side to B-side."
     },
     {
       "type": "straight",

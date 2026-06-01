@@ -338,6 +338,25 @@ export const ANTI_ROLL_BAR = {
 } as const;
 
 /**
+ * Track adhesion ("downforce") configuration.
+ *
+ * Per grounded wheel, an extra force of `downforceCoeff * speed^2` is applied along
+ * -contactNormal (into the road surface). On flat ground this is ordinary downforce;
+ * on a banked turn or the inside of a vertical loop it keeps the wheels glued to the
+ * surface through the inverted top so the car DRIVES the loop rather than launching
+ * off ballistically. Scales with speed^2 so it is negligible at low speed and does
+ * not change normal parking/low-speed handling.
+ *
+ * Sizing: vehicle weight ≈ 1200kg * 9.81 ≈ 11.8kN. At coeff=25 and v=20 m/s, total
+ * over 4 wheels ≈ 4 * 25 * 400 = 40kN (~3.4x weight) — firm grip; at the ~11 m/s loop
+ * apex ≈ 4 * 25 * 121 ≈ 12kN (~1x weight) holding the car onto the inverted surface.
+ */
+export const ADHESION = {
+  /** Downforce coefficient applied per grounded wheel: force = coeff * speed^2 (N). */
+  downforceCoeff: 25,
+} as const;
+
+/**
  * Traction control system (TCS) configuration.
  *
  * Reduces wheelspin by limiting power when slip ratio exceeds threshold.

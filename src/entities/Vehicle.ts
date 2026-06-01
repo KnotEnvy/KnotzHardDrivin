@@ -22,6 +22,7 @@ import {
   RAYCAST_CONFIG,
   ANTI_ROLL_BAR,
   ADVANCED_TUNING,
+  ADHESION,
 } from '../config/PhysicsConfig';
 import { ReplayFrame } from '../systems/ReplayRecorder';
 import { VehicleModelType } from './models/VehicleModelTypes';
@@ -247,10 +248,15 @@ export class Vehicle {
 
     // Create box collider for chassis
     // Dimensions: 2m wide x 1m tall x 4m long
+    //
+    // Standard raycast-vehicle design: the chassis box collider uses default
+    // collision groups so it interacts normally with walls, ground plane, and
+    // all track geometry. Suspension forces come entirely from wheel raycasts;
+    // the chassis box prevents the car from tunnelling through solid walls.
     const colliderDesc = RAPIER.ColliderDesc.cuboid(1.0, 0.5, 2.0)
       .setDensity(this.config.mass / 4.0) // Distribute mass
       .setFriction(0.5)
-      .setRestitution(0.1); // Slight bounciness
+      .setRestitution(0.1);
 
     this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
 
@@ -895,6 +901,16 @@ export class Vehicle {
     // Get damage multiplier once per call (cached)
     const suspensionMultiplier = this.getDamageMultiplier('suspension');
 
+    // Speed-proportional track adhesion ("downforce"). Per grounded wheel we push
+    // the chassis INTO the contact surface (along -contactNormal) scaled by speed^2.
+    // On flat ground this is ordinary downforce; on a banked turn or the inside of a
+    // vertical loop it keeps the wheels glued to the surface through the inverted top
+    // so the car DRIVES the loop instead of flying off ballistically. It scales with
+    // speed^2 so it's negligible at low speed (doesn't change normal parking/handling)
+    // but strong at the high speeds needed to attempt a loop.
+    const speed = this.cachedTransform.linearVelocity.length();
+    const adhesionPerWheel = ADHESION.downforceCoeff * speed * speed;
+
     for (let i = 0; i < 4; i++) {
       const wheelConfig = this.config.wheels[i];
       const wheelState = this.wheels[i];
@@ -942,6 +958,26 @@ export class Vehicle {
         { x: wheelWorldPos.x, y: wheelWorldPos.y, z: wheelWorldPos.z },
         true
       );
+
+      // Track adhesion: push the chassis into the surface along -contactNormal.
+      // (contactNormal points out of the surface toward the car, so -contactNormal
+      // points into it: downward on flat ground, "upward into the overhead surface"
+      // at the top of a loop — keeping the wheels in contact.)
+      // Only applied on TILTED surfaces (banks/ramps/loops): on flat ground the extra
+      // tire load would sap top speed, and it isn't needed there. contactNormal.y < 0.9
+      // ≈ surface tilted more than ~26° from horizontal.
+      if (adhesionPerWheel > 0 && wheelState.contactNormal.y < 0.9) {
+        const adImpulse = adhesionPerWheel * deltaTime;
+        this.rigidBody.applyImpulseAtPoint(
+          {
+            x: -wheelState.contactNormal.x * adImpulse,
+            y: -wheelState.contactNormal.y * adImpulse,
+            z: -wheelState.contactNormal.z * adImpulse,
+          },
+          { x: wheelWorldPos.x, y: wheelWorldPos.y, z: wheelWorldPos.z },
+          true
+        );
+      }
     }
   }
 
@@ -1402,14 +1438,50 @@ export class Vehicle {
    * so low-speed tumble correction (crashes/flips) is preserved.
    */
   private applyStabilityControl(deltaTime: number): void {
-    // --- Loop suppression guard ---
-    // Suppress all stability torques while the vehicle is fully airborne at
-    // high speed so the loop trimesh can guide it without fighting correction.
+    // --- Loop / stunt-surface suppression guard ---
+    //
+    // Case 1: fully airborne at high speed (loop or fast ramp flight).
+    // Let physics run free so the car follows the loop trimesh unimpeded.
     const LOOP_FLIGHT_SPEED_THRESHOLD = 8.0; // m/s — above jump, below loop entry
     const wheelsOffGround = this.wheels.filter(w => !w.isGrounded).length;
     const speed = this.cachedTransform.linearVelocity.length();
     if (wheelsOffGround === 4 && speed > LOOP_FLIGHT_SPEED_THRESHOLD) {
-      // Car is in high-speed free flight (loop or fast jump) — let physics run free.
+      return;
+    }
+
+    // Case 2: grounded on a steeply curved surface (loop bottom/sides, banked curve).
+    // If ANY grounded wheel's contact normal deviates significantly from world-up,
+    // the car is on a non-flat surface.  Suppress stability torques so they don't
+    // fight the surface-following that the suspension forces are providing.
+    //
+    // Threshold: contactNormal.y < 0.92 → surface tilted more than ~23° from flat.
+    // This is aggressively wide to cover the loop entry (theta ≈ 25°) where stability
+    // control would fight the initial tilt needed to track the loop surface.
+    // Normal cornering banks are ≤ 15°, so they're unaffected (cos(15°) ≈ 0.97 > 0.92).
+    if (speed > LOOP_FLIGHT_SPEED_THRESHOLD) {
+      for (const w of this.wheels) {
+        if (w.isGrounded && w.contactNormal.y < 0.92) {
+          // On a steeply-curved grounded surface — suppress stability correction.
+          return;
+        }
+      }
+    }
+
+    // Case 3: high vertical velocity at speed = ascending/descending a loop.
+    // If the car is moving fast (loop speed) and has significant upward velocity,
+    // it's likely on the loop (the suspension forces are propelling it centripetally).
+    // Suppress stability so the car can naturally track the loop's curved surface.
+    const vertVel = this.cachedTransform.linearVelocity.y;
+    if (speed > LOOP_FLIGHT_SPEED_THRESHOLD && Math.abs(vertVel) > 2.0) {
+      // Moving fast with vertical velocity component — on a loop or steep ramp.
+      return;
+    }
+
+    // Case 4: car is significantly elevated from the flat road plane.
+    // When y > 2 m (well above the flat-road height of ~1 m), the car is on a
+    // ramp, loop, or elevated section. Suppress stability so it can freely rotate
+    // to track the curved surface and maintain contact via suspension raycasts.
+    if (this.cachedTransform.position.y > 2.0 && speed > LOOP_FLIGHT_SPEED_THRESHOLD) {
       return;
     }
 
