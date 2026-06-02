@@ -104,6 +104,23 @@ __DOCS__/              # All documentation
 
 ## Recent Fixes
 
+### Session Jun 1, 2026 - Phase 4: Gameplay-Loop Hardening ✅
+1. **Game clock fixed** - `GameEngine.getElapsedTime()` algebraically collapsed to ~2× the
+   last frame delta (no fixed origin), so `CrashManager`'s time never advanced. Consequences:
+   the crash-replay **cooldown never expired** (only one replay per race) and the
+   **post-inversion grace became permanent** once the car inverted. Replaced with a monotonic
+   `engineStartTime` origin.
+2. **Respawn re-arming** - Added `CrashManager.resetDetectionState()` (fresh settle grace +
+   `previousVelocity` re-baseline) wired into both respawn paths, replacing the bare
+   `setEnabled(true)`. Prevents a respawn crash-loop that the clock fix would otherwise unmask.
+3. **Validation** - New `tests/e2e/phase4-fsm-hardening.spec.ts`: FSM glitch-free through the
+   banks (no invalid transitions, finite camera/vehicle, RESULTS builds clean) + crash→replay→
+   respawn re-arms and a **second crash still replays**. CrashManager unit suite 20/20 (repaired
+   pre-existing `up`-vector + `init()` signature mock rot); StateManager 51/51.
+4. **Known debt (pre-existing, not from this work)** - `GameEngine.test.ts` ~14 failures: the
+   ATTRACT state + MenuBackgroundSystem `onStateEnter` side effects outgrew the thin
+   `SceneManager` mock (`scene = {}`). Needs a mock upgrade (separate task).
+
 ### Session Nov 9, 2025 - Visual Enhancement Complete ✅
 1. **3D Menu Background** - Rotating vehicle showcase with cinematic lighting (spot + fill)
 2. **Attract Mode** - "INSERT COIN" landing screen with 30s auto-advance, scrolling high scores

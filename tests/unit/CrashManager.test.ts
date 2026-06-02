@@ -12,6 +12,7 @@ function createMockVehicle() {
       position: new Vector3(0, 1, 0),
       linearVelocity: new Vector3(0, 0, 20),
       forward: new Vector3(0, 0, 1),
+      up: new Vector3(0, 1, 0),
     })),
     getTelemetry: vi.fn(() => ({
       wheelsOnGround: 4,
@@ -40,16 +41,29 @@ function createMockTrack() {
   };
 }
 
+/**
+ * Clears the post-spawn settle grace, which CrashManager measures via accumulated
+ * deltaTime (timeSinceEnabled), NOT gameTime. Ticks > GRACE_PERIOD (1.5s) of frame
+ * time while holding gameTime at 0 so cooldown/inversion timing stays controlled by
+ * the test. Leaves previousVelocity at the vehicle's cruising velocity (no crash).
+ */
+function settlePastGrace(cm: CrashManager) {
+  for (let i = 0; i < 100; i++) cm.update(0.02, 0); // 2.0s of accumulated frame time
+}
+
 describe('CrashManager', () => {
   let crashManager: CrashManager;
   let mockVehicle: any;
   let mockTrack: any;
+  let mockCameraSystem: any;
   let stateCallback: any;
 
   beforeEach(() => {
     crashManager = new CrashManager();
     mockVehicle = createMockVehicle();
     mockTrack = createMockTrack();
+    // CrashManager calls cameraSystem.applyCameraShake() on crash effects.
+    mockCameraSystem = { applyCameraShake: vi.fn() };
     stateCallback = vi.fn();
   });
 
@@ -59,7 +73,7 @@ describe('CrashManager', () => {
 
   describe('initialization', () => {
     it('should initialize correctly with vehicle, track, and callback', () => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
       expect(crashManager.isEnabled()).toBe(true);
     });
 
@@ -68,7 +82,7 @@ describe('CrashManager', () => {
     });
 
     it('should dispose and clear all references', () => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
       crashManager.dispose();
       expect(crashManager.isEnabled()).toBe(false);
     });
@@ -80,7 +94,8 @@ describe('CrashManager', () => {
 
   describe('collision detection', () => {
     beforeEach(() => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
+      settlePastGrace(crashManager);
     });
 
     it('should detect crash on significant velocity change', () => {
@@ -95,6 +110,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0), // Sudden stop from 20 m/s
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
@@ -111,6 +127,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0), // Change from 20 m/s
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
@@ -131,6 +148,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0), // Complete stop from 20 m/s
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
@@ -147,6 +165,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.6); // Past grace period (1.5s)
 
@@ -164,6 +183,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.51);
 
@@ -174,12 +194,14 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 20),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 1.01667);
 
@@ -190,16 +212,70 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 20),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 3.0);
       mockVehicle.getTransform = vi.fn(() => ({
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 3.01667);
 
       expect(replayListener.mock.calls.length).toBeGreaterThan(firstCallCount);
+    });
+  });
+
+  // ========================================================================
+  // RESPAWN RE-ARMING TESTS (resetDetectionState)
+  // ========================================================================
+
+  describe('respawn re-arming (resetDetectionState)', () => {
+    // Cruise at the factory velocity (20 m/s) long enough to clear the 1.5s
+    // post-spawn settle grace; velocity tracking lands previousVelocity at 20.
+    function warmUpPastGrace(cm: CrashManager) {
+      for (let t = 0; t < 2; t += 0.1) cm.update(0.1, t);
+    }
+
+    function stopVehicle() {
+      mockVehicle.getTransform = vi.fn(() => ({
+        position: new Vector3(0, 1, 0),
+        linearVelocity: new Vector3(0, 0, 0),
+        forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
+      }));
+    }
+
+    it('control: setEnabled(true) alone phantom-crashes a stopped respawn (stale baseline)', () => {
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
+      const crashListener = vi.fn();
+      crashManager.onCrash(crashListener);
+
+      warmUpPastGrace(crashManager);   // previousVelocity tracked at 20 m/s, grace elapsed
+      crashManager.setEnabled(false);  // replay: update() early-returns, velocity tracking frozen at 20
+      stopVehicle();                   // respawn teleports the car to a standstill
+      crashManager.setEnabled(true);   // OLD behaviour: re-enable without resync
+
+      // Stale previousVelocity (20) vs current (0) reads as a 20 m/s impulse.
+      crashManager.update(0.01667, 12.0);
+      expect(crashListener).toHaveBeenCalled();
+    });
+
+    it('resetDetectionState re-arms cleanly with no phantom crash on respawn', () => {
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
+      const crashListener = vi.fn();
+      crashManager.onCrash(crashListener);
+
+      warmUpPastGrace(crashManager);
+      crashManager.setEnabled(false);
+      stopVehicle();
+      crashManager.resetDetectionState(); // NEW behaviour: fresh grace + velocity re-baseline
+
+      expect(crashManager.isEnabled()).toBe(true);
+      crashManager.update(0.01667, 12.0);
+      crashManager.update(0.01667, 12.02);
+      expect(crashListener).not.toHaveBeenCalled();
     });
   });
 
@@ -209,7 +285,8 @@ describe('CrashManager', () => {
 
   describe('event system', () => {
     beforeEach(() => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
+      settlePastGrace(crashManager);
     });
 
     it('should call onCrash listeners for all crashes', () => {
@@ -222,6 +299,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.51); // Past grace period
 
@@ -241,6 +319,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.51); // Past grace period
 
@@ -261,6 +340,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.51); // Past grace period
 
@@ -275,7 +355,7 @@ describe('CrashManager', () => {
 
   describe('edge cases', () => {
     it('should not detect crash when disabled', () => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
       crashManager.setEnabled(false);
 
       const crashListener = vi.fn();
@@ -287,6 +367,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.01667);
 
@@ -294,7 +375,7 @@ describe('CrashManager', () => {
     });
 
     it('should not crash when disabled even with velocity changes', () => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
       crashManager.setEnabled(false);
 
       const crashListener = vi.fn();
@@ -306,6 +387,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0), // Major velocity change
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.01667);
 
@@ -319,7 +401,8 @@ describe('CrashManager', () => {
 
   describe('state management', () => {
     beforeEach(() => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
+      settlePastGrace(crashManager);
     });
 
     it('should trigger state transition to CRASHED on major crash', () => {
@@ -329,6 +412,7 @@ describe('CrashManager', () => {
         position: new Vector3(0, 1, 0),
         linearVelocity: new Vector3(0, 0, 0),
         forward: new Vector3(0, 0, 1),
+        up: new Vector3(0, 1, 0),
       }));
       crashManager.update(0.01667, 0.51); // Past grace period
 
@@ -356,7 +440,7 @@ describe('CrashManager', () => {
       damagedVehicle.getDamageState = vi.fn(() => damageState);
 
       const localCrashManager = new CrashManager();
-      localCrashManager.init(damagedVehicle, mockTrack, stateCallback);
+      localCrashManager.init(damagedVehicle, mockTrack, mockCameraSystem, stateCallback);
       localCrashManager.clearDamage();
 
       expect(damageState.overallDamage).toBe(0);
@@ -372,7 +456,7 @@ describe('CrashManager', () => {
 
   describe('statistics and cooldown', () => {
     beforeEach(() => {
-      crashManager.init(mockVehicle, mockTrack, stateCallback);
+      crashManager.init(mockVehicle, mockTrack, mockCameraSystem, stateCallback);
     });
 
     it('should return statistics', () => {

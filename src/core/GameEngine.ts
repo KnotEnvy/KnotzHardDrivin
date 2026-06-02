@@ -89,6 +89,10 @@ export class GameEngine {
 
   private state: GameState = GameState.LOADING;
   private lastTime = 0;
+  // Monotonic origin (ms) captured at construction. getElapsedTime() measures
+  // seconds since this point. Only relative differences are ever used (crash
+  // cooldown, post-inversion grace), so the absolute origin is irrelevant.
+  private readonly engineStartTime = performance.now();
   private running = false;
 
   // Fixed timestep for physics (60Hz)
@@ -492,9 +496,11 @@ export class GameEngine {
             // Reset crash visuals
             this.vehicle.resetCrashVisuals();
 
-            // Re-enable crash detection
+            // Re-arm crash detection with fresh baselines so the respawned car
+            // (velocity zeroed, settling onto the surface) doesn't immediately
+            // re-trigger a crash and loop. See CrashManager.resetDetectionState().
             if (this.crashManager) {
-              this.crashManager.setEnabled(true);
+              this.crashManager.resetDetectionState();
             }
 
             // Transition back to PLAYING
@@ -607,7 +613,12 @@ export class GameEngine {
    * Used for crash detection timing and other time-sensitive systems.
    */
   private getElapsedTime(): number {
-    return (performance.now() - (this.lastTime - (performance.now() - this.lastTime))) / 1000;
+    // Monotonically increasing seconds since engine construction. The previous
+    // implementation collapsed algebraically to ~2x the last frame delta (it had
+    // no dependence on a fixed origin), so crash-detection time never advanced:
+    // the replay cooldown never expired (only one replay per race) and the
+    // post-inversion grace became permanent once the car inverted.
+    return (performance.now() - this.engineStartTime) / 1000;
   }
 
   /**
@@ -1375,10 +1386,11 @@ export class GameEngine {
         this.replayPlayer = null;
       }
 
-      // Re-enable crash detection and respawn vehicle
+      // Respawn vehicle and re-arm crash detection with fresh baselines
+      // (resetDetectionState re-enables; avoids a false crash on the settling car).
       if (this.crashManager) {
         this.crashManager.respawnVehicle();
-        this.crashManager.setEnabled(true);
+        this.crashManager.resetDetectionState();
       }
 
       // Stop crash replay camera

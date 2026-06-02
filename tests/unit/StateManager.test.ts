@@ -27,8 +27,14 @@ describe('StateManager', () => {
 
   describe('canTransition', () => {
     describe('valid transitions', () => {
-      it('should allow LOADING -> MENU', () => {
-        const result = stateManager.canTransition(GameState.LOADING, GameState.MENU);
+      it('should allow LOADING -> ATTRACT', () => {
+        // Boot flows into the arcade attract screen first, then to MENU.
+        const result = stateManager.canTransition(GameState.LOADING, GameState.ATTRACT);
+        expect(result).toBe(true);
+      });
+
+      it('should allow ATTRACT -> MENU', () => {
+        const result = stateManager.canTransition(GameState.ATTRACT, GameState.MENU);
         expect(result).toBe(true);
       });
 
@@ -154,7 +160,7 @@ describe('StateManager', () => {
   describe('getValidTransitions', () => {
     it('should return correct transitions for LOADING state', () => {
       const transitions = stateManager.getValidTransitions(GameState.LOADING);
-      expect(transitions).toEqual([GameState.MENU]);
+      expect(transitions).toEqual([GameState.ATTRACT]);
     });
 
     it('should return correct transitions for MENU state', () => {
@@ -327,8 +333,9 @@ describe('StateManager', () => {
   });
 
   describe('complete state flow scenarios', () => {
-    it('should validate normal game flow: LOADING -> MENU -> PLAYING -> RESULTS -> MENU', () => {
-      expect(stateManager.canTransition(GameState.LOADING, GameState.MENU)).toBe(true);
+    it('should validate normal game flow: LOADING -> ATTRACT -> MENU -> PLAYING -> RESULTS -> MENU', () => {
+      expect(stateManager.canTransition(GameState.LOADING, GameState.ATTRACT)).toBe(true);
+      expect(stateManager.canTransition(GameState.ATTRACT, GameState.MENU)).toBe(true);
       expect(stateManager.canTransition(GameState.MENU, GameState.PLAYING)).toBe(true);
       expect(stateManager.canTransition(GameState.PLAYING, GameState.RESULTS)).toBe(true);
       expect(stateManager.canTransition(GameState.RESULTS, GameState.MENU)).toBe(true);

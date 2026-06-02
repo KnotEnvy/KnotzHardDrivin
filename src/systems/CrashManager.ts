@@ -960,6 +960,31 @@ export class CrashManager {
   }
 
   /**
+   * Re-arms crash detection after a respawn.
+   *
+   * A respawn teleports the vehicle (velocity zeroed) and re-enables detection.
+   * Without resetting the detection baselines this produces a false crash on the
+   * very next frame, because:
+   * - `previousVelocity` is frozen at the pre-crash speed (update() early-returns
+   *   while disabled, so velocity tracking never captured the stop), making the
+   *   first post-respawn `scalarSpeedDrop` huge.
+   * - the post-spawn settle grace (`timeSinceEnabled`) and the post-inversion
+   *   grace (`lastInversionTime`) are stale, so the settling car isn't protected.
+   *
+   * Call this instead of `setEnabled(true)` when returning to PLAYING after a
+   * replay/respawn. Mirrors the baseline setup done in {@link init}.
+   */
+  resetDetectionState(): void {
+    this.timeSinceEnabled = 0;          // fresh post-spawn settle grace
+    this.lastInversionTime = -999;      // clear any frozen inversion grace
+    if (this.vehicle) {
+      // Re-baseline so the first frame's velocity delta is ~0 (no phantom impact).
+      this.previousVelocity.copy(this.vehicle.getTransform().linearVelocity);
+    }
+    this.enabled = true;
+  }
+
+  /**
    * Checks if crash detection is currently active.
    *
    * @returns true if crash detection is enabled and monitoring
