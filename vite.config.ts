@@ -1,30 +1,15 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
 
+// Rapier ships as `@dimforge/rapier3d-compat`: the WASM is embedded as base64
+// inside the JS bundle, so no wasm loader plugin or special config is required.
 export default defineConfig({
-resolve: {
-    alias: {
-    '@': resolve(__dirname, 'src'),
-    '@core': resolve(__dirname, 'src/core'),
-    '@entities': resolve(__dirname, 'src/entities'),
-    '@systems': resolve(__dirname, 'src/systems'),
-    },
-},
-server: {
+  server: {
     port: 4200,
     open: true,
-},
-build: {
-    target: 'es2020',
-    minify: 'terser',
+  },
+  build: {
+    target: 'es2022',
     sourcemap: true,
-    rollupOptions: {
-    output: {
-        manualChunks: {
-        'three': ['three'],
-        'rapier': ['@dimforge/rapier3d-compat'],
-        },
-    },
-    },
-},
+    chunkSizeWarningLimit: 1500, // three + rapier are large; this is expected
+  },
 });
