@@ -57,7 +57,9 @@
       "Bash(taskkill //F //PID 60148)",
       "Bash(taskkill //F //PID 17228)",
       "Bash(taskkill //F //PID 50692)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(xargs wc -l)",
+      "Bash(npx vitest *)"
     ],
     "deny": [],
     "ask": []
