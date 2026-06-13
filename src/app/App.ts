@@ -1,19 +1,16 @@
 import * as THREE from 'three';
-import type RAPIER from '@dimforge/rapier3d-compat';
 import { FIXED_TIMESTEP } from '../config/constants';
 import { Renderer } from '../core/Renderer';
 import { Physics } from '../core/Physics';
 import { Input } from '../core/Input';
 import { GameLoop } from './GameLoop';
+import { Vehicle } from '../entities/Vehicle';
 
 /**
  * Application root. Owns the engine subsystems and the main loop.
  *
- * The current scene is a deliberately small *integration smoke test*: a dynamic
- * cube falls under gravity and settles on a static ground plane. It proves that
- * Three.js rendering, Rapier physics and the fixed-timestep loop are wired
- * together correctly. Real gameplay (vehicle, track, camera) replaces it in the
- * upcoming phases.
+ * Phase 1: a drivable raycast vehicle on a flat ground plane with a chase
+ * camera. The track, race rules and presentation polish arrive in later phases.
  */
 export class App {
   private readonly renderer: Renderer;
@@ -21,12 +18,23 @@ export class App {
   private readonly input: Input;
   private readonly loop: GameLoop;
 
-  // Reusable scratch objects (no per-frame allocations).
-  private readonly tmpQuat = new THREE.Quaternion();
+  private vehicle: Vehicle | null = null;
+  private readonly spawnPos = new THREE.Vector3();
+  private readonly spawnRot = new THREE.Quaternion();
 
-  private demoMesh: THREE.Mesh | null = null;
-  private demoBody: RAPIER.RigidBody | null = null;
-  private angle = 0;
+  // Chase-camera scratch (no per-frame allocation).
+  private readonly carPos = new THREE.Vector3();
+  private readonly fwdFlat = new THREE.Vector3();
+  private readonly camDesired = new THREE.Vector3();
+  private readonly camLookAt = new THREE.Vector3();
+  private cameraInitialised = false;
+
+  private hud: HTMLElement | null = null;
+  private frame = 0;
+
+  private static readonly CAM_DISTANCE = 8.5;
+  private static readonly CAM_HEIGHT = 3.8;
+  private static readonly CAM_LOOK_HEIGHT = 1.2;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -35,8 +43,9 @@ export class App {
     this.loop = new GameLoop({
       fixedStep: FIXED_TIMESTEP,
       update: (dt) => this.fixedUpdate(dt),
-      render: (alpha) => this.render(alpha),
+      render: () => this.render(),
     });
+    this.createHud();
   }
 
   async start(): Promise<void> {
@@ -58,67 +67,91 @@ export class App {
     const { RAPIER } = this.physics;
     const world = this.physics.world;
 
-    // --- Ground: visual plane + static collider (top surface at y = 0). ---
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 120),
+      new THREE.PlaneGeometry(400, 400),
       new THREE.MeshStandardMaterial({ color: 0x3a5f3a, roughness: 0.95 }),
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.renderer.scene.add(ground);
 
-    const grid = new THREE.GridHelper(120, 60, 0x224422, 0x224422);
-    (grid.material as THREE.Material).opacity = 0.25;
-    (grid.material as THREE.Material).transparent = true;
+    const grid = new THREE.GridHelper(400, 100, 0x2c4a2c, 0x254025);
+    const gm = grid.material as THREE.Material;
+    gm.transparent = true;
+    gm.opacity = 0.3;
     this.renderer.scene.add(grid);
 
-    world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setTranslation(0, -0.5, 0));
+    world.createCollider(RAPIER.ColliderDesc.cuboid(200, 0.5, 200).setTranslation(0, -0.5, 0));
 
-    // --- Falling cube: visual mesh + dynamic body. ---
-    this.demoMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.5, 1.5, 1.5),
-      new THREE.MeshStandardMaterial({ color: 0x2bff88, roughness: 0.4, metalness: 0.1 }),
-    );
-    this.demoMesh.castShadow = true;
-    this.renderer.scene.add(this.demoMesh);
-
-    this.demoBody = world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 9, 0).setLinearDamping(0.05),
-    );
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.75, 0.75, 0.75).setRestitution(0.45).setFriction(0.8),
-      this.demoBody,
-    );
+    this.vehicle = new Vehicle(this.physics, this.renderer.scene);
+    this.spawnPos.set(0, this.vehicle.spawnHeight, 0);
+    this.spawnRot.identity();
   }
 
   private fixedUpdate(dt: number): void {
     this.input.update();
-    // Nudge the cube with steering input so the controls are visibly alive.
-    if (this.demoBody && this.input.state.steer !== 0) {
-      this.demoBody.applyImpulse({ x: this.input.state.steer * 0.6, y: 0, z: 0 }, true);
+    if (!this.vehicle) return;
+
+    if (this.input.state.reset) {
+      this.vehicle.respawn(this.spawnPos, this.spawnRot);
+    } else {
+      this.vehicle.fixedUpdate(dt, this.input.state);
     }
     this.physics.step(dt);
   }
 
-  private render(_alpha: number): void {
-    // Sync the rendered cube to the physics body.
-    if (this.demoMesh && this.demoBody) {
-      const t = this.demoBody.translation();
-      const r = this.demoBody.rotation();
-      this.demoMesh.position.set(t.x, t.y, t.z);
-      this.demoMesh.quaternion.copy(this.tmpQuat.set(r.x, r.y, r.z, r.w));
+  private render(): void {
+    if (!this.vehicle) {
+      this.renderer.render();
+      return;
     }
 
-    // Slow orbit so the 3D scene reads as 3D at a glance.
-    this.angle += 0.0025;
-    const radius = 16;
-    this.renderer.camera.position.set(
-      Math.sin(this.angle) * radius,
-      8,
-      Math.cos(this.angle) * radius,
-    );
-    this.renderer.camera.lookAt(0, 1.5, 0);
-
+    this.vehicle.syncMesh();
+    this.updateCamera();
     this.renderer.render();
+
+    if (++this.frame % 4 === 0) this.updateHud();
+  }
+
+  private updateCamera(): void {
+    const cam = this.renderer.camera;
+    this.vehicle!.getPosition(this.carPos);
+    this.vehicle!.getFlatForward(this.fwdFlat);
+
+    this.camDesired
+      .copy(this.carPos)
+      .addScaledVector(this.fwdFlat, -App.CAM_DISTANCE);
+    this.camDesired.y += App.CAM_HEIGHT;
+
+    if (!this.cameraInitialised) {
+      cam.position.copy(this.camDesired);
+      this.cameraInitialised = true;
+    } else {
+      cam.position.lerp(this.camDesired, 0.1);
+    }
+
+    this.camLookAt.copy(this.carPos);
+    this.camLookAt.y += App.CAM_LOOK_HEIGHT;
+    cam.lookAt(this.camLookAt);
+  }
+
+  private createHud(): void {
+    const host = document.getElementById('hud');
+    if (!host) return;
+    this.hud = document.createElement('div');
+    this.hud.style.cssText =
+      'position:absolute;left:12px;bottom:12px;padding:8px 12px;border-radius:8px;' +
+      'background:rgba(0,0,0,0.45);color:#bfffce;font:600 14px/1.4 system-ui,sans-serif;' +
+      'white-space:pre;backdrop-filter:blur(4px);';
+    host.appendChild(this.hud);
+  }
+
+  private updateHud(): void {
+    if (!this.hud || !this.vehicle) return;
+    const kmh = Math.round(Math.abs(this.vehicle.forwardSpeed) * 3.6);
+    this.hud.textContent =
+      `${kmh} km/h\n` +
+      `wheels grounded: ${this.vehicle.groundedCount}/4\n` +
+      `WASD/Arrows · Space handbrake · R reset`;
   }
 }

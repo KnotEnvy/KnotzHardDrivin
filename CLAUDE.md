@@ -58,15 +58,16 @@ docs/                # DESIGN.md, ROADMAP.md
 
 ---
 
-## The agent team (lean, 5 broad roles)
+## The agent team (6 roles, structured for a driving game)
 
 Defined in `.claude/agents/`. Delegate domain work to these:
 
-- **engine-core** — loop, state machine, Rapier world, input core, config, build, perf budgets.
-- **gameplay** — vehicle dynamics, track/spline + collision, race rules, replay/ghost, crash, persistence.
-- **render-art** — Three.js visuals, lighting, shaders, cameras, VFX, post FX, **and audio** (Howler).
-- **ui-ux** — HUD, menus, **mobile touch controls**, responsive layout, settings, accessibility.
-- **qa** — Vitest + Playwright, CI, coverage, perf validation, doc accuracy.
+- **engine-architect** — loop, state machine, Rapier world, input core, event bus, config, build, perf budgets, and cross-system integration/arbitration.
+- **vehicle-dynamics** — the car: raycast wheels, suspension, drivetrain, tire grip, drift, steering, feel, respawn, impact signal. *The most important role — the car is the product.*
+- **world-builder** — track spline + collision, race rules (laps/checkpoints/timing), spawn/respawn, replay/ghost, results persistence, environment.
+- **presentation** — Three.js visuals, lighting, shaders, cameras (incl. cinematic replay), VFX, post FX, **and audio** (Howler).
+- **ui-mobile** — HUD, menus, **on-screen touch controls**, responsive layout, settings persistence, accessibility.
+- **qa** — Vitest + Playwright, CI, coverage, perf validation, doc accuracy, and the play-readiness gate.
 
 ---
 
@@ -81,7 +82,7 @@ Defined in `.claude/agents/`. Delegate domain work to these:
 ## Project gotchas (learned the hard way)
 
 - **Wheel raycasts must use the real surface normal**, not world-up — this is what
-  made banked/looping tracks undrivable in v1. (See `gameplay` agent notes.)
+  made banked/looping tracks undrivable in v1. (See `vehicle-dynamics` agent notes.)
 - **Don't force-close the track spline or flatten elevation/pitch** — drive the
   collision mesh off the same spline as the visuals.
 - **E2E must run headed** — headless throttles `requestAnimationFrame` and freezes the loop.
