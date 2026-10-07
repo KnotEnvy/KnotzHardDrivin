@@ -1,15 +1,19 @@
+> Historical design from the oval prototype. Current build and remaining scope: [ASSESSMENT.md](ASSESSMENT.md) and [../README.md](../README.md).
+
 # Hard Drivin' 2.0 — Design & Architecture
 
 ## Vision
-A modern, browser- and mobile-native remake of the arcade classic *Hard Drivin'*:
-fast stunt driving with a signature **loop-the-loop and ramp jumps**, an instant
-**crash replay**, ghost-lap time trials, and a tight feel that holds 60fps on a
-mid-range phone. Pick up and play in seconds; deep enough to chase lap times.
+A modern, browser- and mobile-native **driving & racing** game: tight arcade car
+feel across a progression of tracks — race circuits (starting with a speedway
+oval) through to long **cross-country drives** — with crash replays, ghost-lap
+time trials, and a modern original look that holds 60fps on a mid-range phone.
+Pick up and play in seconds; deep enough to chase lap times. *Hard Drivin'* is
+inspiration only — no stunts/loops.
 
 ## Pillars
 1. **Feel first.** The car must be a joy to drive before anything else is built.
 2. **Runs anywhere.** One codebase, 60fps on mid-range mobile and desktop.
-3. **Spectacle, cheaply.** Loops, jumps, crashes and replays — within budget.
+3. **Modern look, cheaply.** PBR + sky/IBL + post-FX that stays within budget.
 4. **Honest engineering.** Deterministic sim, tested logic, verified at runtime.
 
 ## Architecture overview

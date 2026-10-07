@@ -3,16 +3,17 @@
   "version": "2.0.0-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Hard Drivin' — a browser & mobile 3D stunt-driving game (clean-slate rewrite).",
+  "description": "Hard Drivin': Pacific Run — a coastal driving game built with Three.js and Rapier.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/optimize-assets.mjs dist",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "benchmark:performance": "node scripts/benchmark-performance.mjs",
+    "verify:performance-build": "node scripts/verify-performance-build.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.1",

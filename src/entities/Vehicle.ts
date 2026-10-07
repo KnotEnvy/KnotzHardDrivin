@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createCar, createWheel } from './CarModel';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Physics } from '../core/Physics';
 import type { InputState } from '../core/Input';
@@ -14,6 +16,8 @@ interface Wheel {
   /** Current suspension length (attach → wheel centre), for visuals. */
   length: number;
   spin: number;
+  previousLength:number;
+  previousSpin:number;
 }
 
 /**
@@ -35,6 +39,9 @@ export class Vehicle {
   private readonly wheels: Wheel[] = [];
 
   private steerAngle = 0;
+  private previousSteer=0;
+  private previousPosition=new THREE.Vector3();
+  private previousRotation=new THREE.Quaternion();
   private _groundedCount = 0;
 
   // --- scratch (reused every step; avoids per-frame allocation) ---
@@ -120,8 +127,9 @@ export class Vehicle {
     this.body.setRotation(rotation, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    this.steerAngle = 0;
-    for (const w of this.wheels) w.length = C.suspensionRest;
+    this.steerAngle = this.previousSteer = 0;
+    this.previousPosition.copy(position);this.previousRotation.copy(rotation);
+    for (const w of this.wheels){w.length=w.previousLength=C.suspensionRest;w.spin=w.previousSpin=0;}
     this.syncMesh();
   }
 
@@ -136,6 +144,8 @@ export class Vehicle {
     this.angvel.set(av.x, av.y, av.z);
     this.com.set(cm.x, cm.y, cm.z);
     this.readQuat();
+    this.previousPosition.copy(this.pos);this.previousRotation.copy(this.quat);this.previousSteer=this.steerAngle;
+    for(const wheel of this.wheels){wheel.previousLength=wheel.length;wheel.previousSpin=wheel.spin;}
 
     this.fwd.copy(Vehicle.LOCAL_FWD).applyQuaternion(this.quat);
     this.right.copy(Vehicle.LOCAL_RIGHT).applyQuaternion(this.quat);
@@ -144,7 +154,7 @@ export class Vehicle {
     // Speed-sensitive steering toward the input target.
     const speed = Math.hypot(lv.x, lv.y, lv.z);
     const falloff = 1 - C.steerSpeedFalloff * clamp(speed / C.highSpeed, 0, 1);
-    const targetSteer = input.steer * C.maxSteer * falloff;
+    const targetSteer = -input.steer * C.maxSteer * falloff;
     this.steerAngle = moveToward(this.steerAngle, targetSteer, C.steerSpeed * dt);
 
     const mass = this.body.mass();
@@ -211,6 +221,7 @@ export class Vehicle {
       const vLat = this.pointVel.dot(this.wheelLat);
 
       // --- Longitudinal force (engine / brake / reverse / rolling). ---
+      const rearHandbrake = !wheel.isFront && input.handbrake;
       let drive = 0;
       if (input.throttle > 0) drive += (input.throttle * C.maxEngineForce) / 4;
       if (input.brake > 0) {
@@ -219,12 +230,13 @@ export class Vehicle {
             ? (input.brake * C.maxBrakeForce) / 4
             : (input.brake * C.reverseForce) / 4;
       }
+      // Rear parking brake opposes travel in either direction and stops at zero.
+      if(rearHandbrake)drive=clampMagnitude(-massCorner*vForward/dt,C.handbrakeForce/2);
       drive -= vForward * C.rollingResistance;
       const traction = C.longitudinalGrip * normalLoad;
       const longImpulse = clampMagnitude(drive, traction) * dt;
 
       // --- Lateral grip: try to cancel side-slip, limited by friction. ---
-      const rearHandbrake = !wheel.isFront && input.handbrake;
       const latMu = C.lateralGrip * (rearHandbrake ? C.handbrakeRearGrip : 1);
       const maxLatImpulse = latMu * normalLoad * dt;
       const latImpulse = clampMagnitude(-massCorner * vLat, maxLatImpulse);
@@ -257,15 +269,16 @@ export class Vehicle {
   }
 
   /** Copy physics transform → meshes. Call once per rendered frame. */
-  syncMesh(): void {
+  syncMesh(alpha=1): void {
+    const blend=clamp(alpha,0,1);
     const t = this.body.translation();
     const r = this.body.rotation();
-    this.mesh.position.set(t.x, t.y, t.z);
-    this.mesh.quaternion.set(r.x, r.y, r.z, r.w);
+    this.mesh.position.set(t.x, t.y, t.z).lerp(this.previousPosition,1-blend);
+    this.mesh.quaternion.copy(this.previousRotation).slerp(this.quat.set(r.x,r.y,r.z,r.w),blend);
     for (const w of this.wheels) {
-      w.group.position.set(w.local.x, w.local.y - w.length, w.local.z);
-      w.group.rotation.y = w.isFront ? this.steerAngle : 0;
-      (w.group.children[0] as THREE.Mesh).rotation.x = w.spin;
+      w.group.position.set(w.local.x, w.local.y - (w.previousLength+(w.length-w.previousLength)*blend), w.local.z);
+      w.group.rotation.y = w.isFront ? this.previousSteer+(this.steerAngle-this.previousSteer)*blend : 0;
+      (w.group.children[0] as THREE.Mesh).rotation.x = w.previousSpin+(w.spin-w.previousSpin)*blend;
     }
   }
 
@@ -282,29 +295,49 @@ export class Vehicle {
     return out.set(t.x, t.y, t.z);
   }
 
+  /** World-space linear velocity (m/s). */
+  getVelocity(out: THREE.Vector3): THREE.Vector3 {
+    const v = this.body.linvel();
+    return out.set(v.x, v.y, v.z);
+  }
+
   private readQuat(): THREE.Quaternion {
     const r = this.body.rotation();
     return this.quat.set(r.x, r.y, r.z, r.w);
   }
 
-  private buildMesh(): void {
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(C.chassisHalfExtents.x * 2, 0.5, C.chassisHalfExtents.z * 2),
-      new THREE.MeshStandardMaterial({ color: 0xd6263a, metalness: 0.3, roughness: 0.45 }),
-    );
-    body.position.y = 0.05;
-    body.castShadow = true;
-
-    const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(1.35, 0.5, 1.9),
-      new THREE.MeshStandardMaterial({ color: 0x101418, metalness: 0.2, roughness: 0.3 }),
-    );
-    cabin.position.set(0, 0.45, -0.1);
-    cabin.castShadow = true;
-
-    this.mesh.add(body, cabin);
+  setPaint(color: number): void {
+    this.mesh.traverse(o => {
+      const m = o as THREE.Mesh;
+      const material = m.material as THREE.MeshPhysicalMaterial | undefined;
+      if (material?.isMeshPhysicalMaterial && (material.metalness === 0.65 || material.name === 'Vela coachwork')) material.color.setHex(color);
+    });
   }
 
+  async loadCoachwork():Promise<void> {
+    const asset=await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/vela-gt.glb`);
+    const old=this.mesh.children[0];old.removeFromParent();
+    old.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.dispose());}});
+    asset.scene.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;if(!Array.isArray(o.material)){
+        o.material.side=THREE.DoubleSide;
+        if(o.material.name==='Smoked blue glazing'){
+          const glass=new THREE.MeshPhysicalMaterial({color:0x19272c,metalness:.12,roughness:.07,clearcoat:1,transparent:true,opacity:.82,depthWrite:false,envMapIntensity:1.65,side:THREE.DoubleSide});
+          glass.name='Vela smoked glass';glass.forceSinglePass=true;o.material.dispose();o.material=glass;
+        }
+      }}});
+    this.mesh.add(asset.scene);
+  }
+  setLights(braking:boolean,boosting:boolean):void {
+    this.mesh.traverse(o=>{
+      if(!(o instanceof THREE.Mesh)||Array.isArray(o.material))return;
+      const m=o.material as THREE.MeshStandardMaterial;
+      if(m.name==='Ruby LED')m.emissiveIntensity=braking?5:2.4;
+      if(m.name==='Ivory LED')m.emissiveIntensity=boosting?3.6:3;
+    });
+  }
+  private buildMesh(): void {
+    this.mesh.add(createCar(0xf1a344, false));
+  }
   private buildWheels(): void {
     const layout: ReadonlyArray<readonly [number, number, boolean]> = [
       [-C.halfTrack, -C.halfWheelbase, true], // FL
@@ -313,18 +346,14 @@ export class Vehicle {
       [C.halfTrack, C.halfWheelbase, false], // RR
     ];
 
-    const geo = new THREE.CylinderGeometry(C.wheelRadius, C.wheelRadius, 0.3, 18);
-    geo.rotateZ(Math.PI / 2); // axle along local X so it rolls about X
-    const mat = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.85 });
-
     for (const [x, z, isFront] of layout) {
       const group = new THREE.Group();
       group.position.set(x, C.wheelMountY - C.suspensionRest, z);
-      const wheelMesh = new THREE.Mesh(geo, mat);
-      wheelMesh.castShadow = true;
+      const wheelMesh = createWheel(C.wheelRadius);
       group.add(wheelMesh);
       this.mesh.add(group);
       this.wheels.push({
+        previousLength:C.suspensionRest,previousSpin:0,
         local: new THREE.Vector3(x, C.wheelMountY, z),
         isFront,
         group,

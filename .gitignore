@@ -41,3 +41,11 @@ Thumbs.db
 *.temp
 *.bak
 *.old
+
+# Local generated galleries, recordings, editable asset outputs and evidence
+/artifacts/
+# Machine-specific assistant configuration
+/.claude/
+# Blender autosaves
+*.blend1
+*.blend2
